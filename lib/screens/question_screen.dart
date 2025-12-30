@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../app.dart';
 import '../models/challenge.dart';
+import '../state/ad_provider.dart';
 import '../state/challenge_providers.dart';
+import '../state/subscription_provider.dart';
 import '../theme/brain_duel_theme.dart';
 import '../widgets/app_scaffold.dart';
 import '../widgets/bd_answer_option_tile.dart';
@@ -43,6 +45,8 @@ class _QuestionScreenState extends ConsumerState<QuestionScreen> {
     final isReadPhase = state.phase == QuestionPhase.reading;
     final isAnswerPhase = state.phase == QuestionPhase.answering;
     final isLocked = state.phase == QuestionPhase.locked;
+    final isSubmitting = state.submitting;
+    final isSubmitted = state.submitted;
     final remainingSeconds = isReadPhase
         ? (state.remainingReadMs / 1000).ceil()
         : (state.remainingAnswerMs / 1000).ceil();
@@ -122,17 +126,37 @@ class _QuestionScreenState extends ConsumerState<QuestionScreen> {
             ),
             const SizedBox(height: 8),
             FilledButton(
-              onPressed: !isLocked
+              onPressed: !isLocked || isSubmitting || isSubmitted
                   ? null
-                  : () {
-                if (isLastQuestion) {
-                  context.goNamed(TriviaApp.nameHome);
-                } else {
-                  ref.read(challengeAttemptProvider.notifier).nextQuestion();
-                }
-              },
+                  : () async {
+                      if (isLastQuestion) {
+                        final notifier = ref.read(challengeAttemptProvider.notifier);
+                        final result = await notifier.submitAttempt();
+                        if (!mounted || result == null) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Unable to submit attempt. Try again.')),
+                            );
+                          }
+                          return;
+                        }
+                        final isPaid = ref.read(isPaidUserProvider);
+                        if (!isPaid) {
+                          await ref.read(adServiceProvider).showInterstitial(context);
+                        }
+                        if (!mounted) return;
+                        context.goNamed(
+                          TriviaApp.nameResults,
+                          extra: {'challengeResult': result},
+                        );
+                      } else {
+                        ref.read(challengeAttemptProvider.notifier).nextQuestion();
+                      }
+                    },
               child: Text(
-                isLastQuestion ? 'Submit Attempt' : 'Next Question',
+                isLastQuestion
+                    ? (isSubmitting ? 'Submitting...' : 'Submit Attempt')
+                    : 'Next Question',
               ),
             ),
           ],
