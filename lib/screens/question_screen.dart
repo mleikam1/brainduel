@@ -37,8 +37,16 @@ class _QuestionScreenState extends ConsumerState<QuestionScreen> {
     final state = ref.watch(challengeAttemptProvider);
     final attempt = state.attempt ?? widget.attempt;
     final question = attempt.questions[state.currentIndex];
-    final selectedChoiceId = state.selectedAnswers[question.id];
+    final answerRecord = state.answerRecords[question.id];
+    final selectedChoiceId = answerRecord?.choiceId;
     final isLastQuestion = state.currentIndex >= attempt.questions.length - 1;
+    final isReadPhase = state.phase == QuestionPhase.reading;
+    final isAnswerPhase = state.phase == QuestionPhase.answering;
+    final isLocked = state.phase == QuestionPhase.locked;
+    final remainingSeconds = isReadPhase
+        ? (state.remainingReadMs / 1000).ceil()
+        : (state.remainingAnswerMs / 1000).ceil();
+    final phaseLabel = isReadPhase ? 'Read' : 'Time';
 
     return BDAppScaffold(
       title: 'Challenge Run',
@@ -56,6 +64,8 @@ class _QuestionScreenState extends ConsumerState<QuestionScreen> {
                 ),
                 const SizedBox(width: 8),
                 BDStatPill(label: 'Mode', value: 'Challenge'),
+                const SizedBox(width: 8),
+                BDStatPill(label: phaseLabel, value: '${remainingSeconds}s'),
                 const Spacer(),
               ],
             ),
@@ -86,17 +96,23 @@ class _QuestionScreenState extends ConsumerState<QuestionScreen> {
                     ),
                     const SizedBox(height: 16),
                     ...question.choices.map((choice) {
-                      final stateValue = selectedChoiceId == choice.id
+                      final isSelected = selectedChoiceId == choice.id;
+                      final isDisabled = !isAnswerPhase;
+                      final stateValue = isSelected
                           ? BDAnswerState.selected
-                          : BDAnswerState.idle;
+                          : isDisabled
+                              ? BDAnswerState.disabled
+                              : BDAnswerState.idle;
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 12),
                         child: BDAnswerOptionTile(
                           text: choice.text,
                           state: stateValue,
-                          onTap: () => ref
-                              .read(challengeAttemptProvider.notifier)
-                              .selectChoice(question.id, choice.id),
+                          onTap: isAnswerPhase && !isLocked
+                              ? () => ref
+                                  .read(challengeAttemptProvider.notifier)
+                                  .selectChoice(question.id, choice.id)
+                              : null,
                         ),
                       );
                     }),
@@ -106,7 +122,9 @@ class _QuestionScreenState extends ConsumerState<QuestionScreen> {
             ),
             const SizedBox(height: 8),
             FilledButton(
-              onPressed: () {
+              onPressed: !isLocked
+                  ? null
+                  : () {
                 if (isLastQuestion) {
                   context.goNamed(TriviaApp.nameHome);
                 } else {
