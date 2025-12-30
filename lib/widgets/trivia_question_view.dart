@@ -43,13 +43,15 @@ class TriviaQuestionView extends StatelessWidget {
               ),
               if (q.mediaUrl != null) ...[
                 const SizedBox(height: 12),
-                Container(
-                  height: 140,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(14),
-                    color: Theme.of(context).colorScheme.primary.withOpacity(0.08),
+                AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(14),
+                      color: Theme.of(context).colorScheme.primary.withOpacity(0.08),
+                    ),
+                    child: const Center(child: Icon(Icons.image, size: 36)),
                   ),
-                  child: const Center(child: Icon(Icons.image, size: 36)),
                 ),
               ],
             ],

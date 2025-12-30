@@ -24,30 +24,33 @@ class CategoryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return BDCard(
       onTap: onTap,
-      // RenderFlex overflow diagnosis: a Spacer inside a grid-constrained card
-      // forced stat pills below the visible bounds. Fix by shrink-wrapping the
-      // column and letting pills wrap within available space.
+      // Overflow-safe card layout: shrink-wrap the column and wrap badges so
+      // the card grows vertically with content in grids/lists.
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            height: 44,
-            width: 44,
-            decoration: BoxDecoration(
-              color: BrainDuelColors.glacier.withOpacity(0.12),
-              borderRadius: const BorderRadius.all(BrainDuelRadii.sm),
-            ),
-            child: Center(
-              child: Text(
-                category.icon,
-                style: const TextStyle(fontSize: 22),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: BrainDuelColors.glacier.withOpacity(0.12),
+                  borderRadius: const BorderRadius.all(BrainDuelRadii.sm),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(10),
+                  child: Text(
+                    category.icon,
+                    style: const TextStyle(fontSize: 22),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           Text(
             category.title,
             style: Theme.of(context).textTheme.titleSmall,
@@ -61,10 +64,10 @@ class CategoryCard extends StatelessWidget {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           Wrap(
-            spacing: 6,
-            runSpacing: 6,
+            spacing: 8,
+            runSpacing: 8,
             children: [
               BDStatPill(label: 'Qs', value: '$questionCount'),
               BDStatPill(label: 'Pts', value: '$points'),

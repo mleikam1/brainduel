@@ -123,34 +123,55 @@ class _EventChallengeCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return BDCard(
       onTap: onTap,
+      // Overflow-safe card layout: shrink-wrapped column with wrapping badges
+      // so the card can grow vertically in lists.
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              Text(
-                challenge.title,
-                style: Theme.of(context).textTheme.titleSmall,
+              Chip(
+                label: Text(
+                  challenge.badge,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-              const Spacer(),
-              Chip(label: Text(challenge.badge)),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           Text(
-            challenge.subtitle,
-            style: Theme.of(context).textTheme.bodySmall,
+            challenge.title,
+            style: Theme.of(context).textTheme.titleSmall,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
-          const SizedBox(height: 12),
-          Row(
+          if (challenge.subtitle.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              challenge.subtitle,
+              style: Theme.of(context).textTheme.bodySmall,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
             children: [
-              Text(
-                challenge.timeRemaining,
-                style: Theme.of(context).textTheme.labelLarge,
+              Chip(
+                label: Text(
+                  challenge.timeRemaining,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-              const Spacer(),
               BDStatPill(label: 'Qs', value: '${challenge.questionCount}'),
-              const SizedBox(width: 8),
               BDStatPill(label: 'Pts', value: '${challenge.points}'),
             ],
           ),
