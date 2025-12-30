@@ -13,6 +13,7 @@ import '../widgets/bd_buttons.dart';
 import '../widgets/bd_card.dart';
 import '../widgets/bd_stat_pill.dart';
 import '../widgets/category_card.dart';
+import '../widgets/challenge_card.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -22,8 +23,8 @@ class HomeScreen extends ConsumerWidget {
     final categoriesAsync = ref.watch(categoriesProvider);
     final homeFeedAsync = ref.watch(homeFeedProvider);
     final textScale = MediaQuery.textScaleFactorOf(context);
-    final carouselHeight = (192 + (textScale - 1) * 72).clamp(192, 280).toDouble();
-    final exploreHeight = (184 + (textScale - 1) * 72).clamp(184, 260).toDouble();
+    final carouselHeight = (220 + (textScale - 1) * 96).clamp(220, 320).toDouble();
+    final exploreHeight = (220 + (textScale - 1) * 96).clamp(220, 320).toDouble();
 
     return BDAppScaffold(
       title: 'Brain Duel',
@@ -34,163 +35,191 @@ class HomeScreen extends ConsumerWidget {
           icon: const BDAvatar(name: 'Alex', radius: 18),
         ),
       ],
-      child: ListView(
-        padding: const EdgeInsets.all(BrainDuelSpacing.sm),
-        children: [
-          BDCard(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Welcome back, Alex',
-                  style: Theme.of(context).textTheme.titleMedium,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Ranked streak: 4 wins',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 16),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: const [
-                    BDStatPill(label: 'Rank', value: 'Gold'),
-                    BDStatPill(label: 'Season', value: '18'),
-                    BDStatPill(label: 'Win %', value: '62'),
+      child: CustomScrollView(
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.all(BrainDuelSpacing.sm),
+            sliver: SliverToBoxAdapter(
+              child: BDCard(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Welcome back, Alex',
+                      style: Theme.of(context).textTheme.titleMedium,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Ranked streak: 4 wins',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 16),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: const [
+                        BDStatPill(label: 'Rank', value: 'Gold'),
+                        BDStatPill(label: 'Season', value: '18'),
+                        BDStatPill(label: 'Win %', value: '62'),
+                      ],
+                    ),
                   ],
                 ),
-              ],
+              ),
             ),
           ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: BDPrimaryButton(
-                  label: 'Play Solo',
-                  icon: Icons.play_arrow,
-                  isExpanded: true,
-                  onPressed: () => context.pushNamed(TriviaApp.nameCategories),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: BDSecondaryButton(
-                  label: 'Duel a Friend',
-                  icon: Icons.people,
-                  isExpanded: true,
-                  onPressed: () => context.pushNamed(TriviaApp.nameFriends),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          homeFeedAsync.when(
-            data: (homeFeed) {
-              final seasonalEvent = homeFeed.seasonalEvent;
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: BrainDuelSpacing.sm),
+            sliver: SliverToBoxAdapter(
+              child: Row(
                 children: [
-                  _SectionHeader(title: 'Daily Challenges'),
-                  const SizedBox(height: 12),
-                  _ChallengeCarousel(
-                    challenges: homeFeed.dailyChallenges,
-                    height: carouselHeight,
-                    onTap: (challengeId) => context.pushNamed(
-                      TriviaApp.nameChallengeIntro,
-                      pathParameters: {'challengeId': challengeId},
+                  Expanded(
+                    child: BDPrimaryButton(
+                      label: 'Play Solo',
+                      icon: Icons.play_arrow,
+                      isExpanded: true,
+                      onPressed: () => context.pushNamed(TriviaApp.nameCategories),
                     ),
                   ),
-                  const SizedBox(height: 20),
-                  if (seasonalEvent != null) ...[
-                    _SeasonalEventBanner(
-                      event: seasonalEvent,
-                      onTap: () => context.pushNamed(TriviaApp.nameSeasonalEvent),
-                    ),
-                    const SizedBox(height: 20),
-                  ],
-                  _SectionHeader(title: 'Trending Public Challenges'),
-                  const SizedBox(height: 12),
-                  _ChallengeCarousel(
-                    challenges: homeFeed.trendingChallenges,
-                    height: carouselHeight,
-                    onTap: (challengeId) => context.pushNamed(
-                      TriviaApp.nameChallengeIntro,
-                      pathParameters: {'challengeId': challengeId},
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: BDSecondaryButton(
+                      label: 'Duel a Friend',
+                      icon: Icons.people,
+                      isExpanded: true,
+                      onPressed: () => context.pushNamed(TriviaApp.nameFriends),
                     ),
                   ),
                 ],
-              );
-            },
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (error, _) => Center(
-              child: Text(
-                'Failed to load: $error',
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
               ),
             ),
           ),
-          const SizedBox(height: 20),
-          _SectionHeader(
-            title: 'Explore Topics',
-            actionLabel: 'See all',
-            onAction: () => context.pushNamed(TriviaApp.nameCategories),
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: exploreHeight,
-            child: categoriesAsync.when(
-              data: (categories) {
-                return ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: categories.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 12),
-                  itemBuilder: (context, index) {
-                    final category = categories[index];
-                    final detail = ref.read(categoryDetailProvider(category));
-                    return SizedBox(
-                      width: 190,
-                      child: CategoryCard(
-                        category: category,
-                        subtitle: detail.subtitle,
-                        points: detail.points,
-                        questionCount: detail.questionCount,
-                        onTap: () => context.pushNamed(
-                          TriviaApp.nameCategoryDetail,
-                          extra: category.id,
+          const SliverToBoxAdapter(child: SizedBox(height: 20)),
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: BrainDuelSpacing.sm),
+            sliver: SliverToBoxAdapter(
+              child: homeFeedAsync.when(
+                data: (homeFeed) {
+                  final seasonalEvent = homeFeed.seasonalEvent;
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _SectionHeader(title: 'Daily Challenges'),
+                      const SizedBox(height: 12),
+                      _ChallengeCarousel(
+                        challenges: homeFeed.dailyChallenges,
+                        height: carouselHeight,
+                        onTap: (challengeId) => context.pushNamed(
+                          TriviaApp.nameChallengeIntro,
+                          pathParameters: {'challengeId': challengeId},
                         ),
                       ),
+                      const SizedBox(height: 20),
+                      if (seasonalEvent != null) ...[
+                        _SeasonalEventBanner(
+                          event: seasonalEvent,
+                          onTap: () => context.pushNamed(TriviaApp.nameSeasonalEvent),
+                        ),
+                        const SizedBox(height: 20),
+                      ],
+                      _SectionHeader(title: 'Trending Public Challenges'),
+                      const SizedBox(height: 12),
+                      _ChallengeCarousel(
+                        challenges: homeFeed.trendingChallenges,
+                        height: carouselHeight,
+                        onTap: (challengeId) => context.pushNamed(
+                          TriviaApp.nameChallengeIntro,
+                          pathParameters: {'challengeId': challengeId},
+                        ),
+                      ),
+                    ],
+                  );
+                },
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (error, _) => Center(
+                  child: Text(
+                    'Failed to load: $error',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SliverToBoxAdapter(child: SizedBox(height: 20)),
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: BrainDuelSpacing.sm),
+            sliver: SliverToBoxAdapter(
+              child: _SectionHeader(
+                title: 'Explore Topics',
+                actionLabel: 'See all',
+                onAction: () => context.pushNamed(TriviaApp.nameCategories),
+              ),
+            ),
+          ),
+          const SliverToBoxAdapter(child: SizedBox(height: 12)),
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: BrainDuelSpacing.sm),
+            sliver: SliverToBoxAdapter(
+              child: SizedBox(
+                height: exploreHeight,
+                child: categoriesAsync.when(
+                  data: (categories) {
+                    return ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: categories.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 12),
+                      itemBuilder: (context, index) {
+                        final category = categories[index];
+                        final detail = ref.read(categoryDetailProvider(category));
+                        return SizedBox(
+                          width: 210,
+                          child: CategoryCard(
+                            category: category,
+                            subtitle: detail.subtitle,
+                            points: detail.points,
+                            questionCount: detail.questionCount,
+                            onTap: () => context.pushNamed(
+                              TriviaApp.nameCategoryDetail,
+                              extra: category.id,
+                            ),
+                          ),
+                        );
+                      },
                     );
                   },
-                );
-              },
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (error, _) => Center(
-                child: Text(
-                  'Failed to load: $error',
-                  maxLines: 2,
+                  loading: () => const Center(child: CircularProgressIndicator()),
+                  error: (error, _) => Center(
+                    child: Text(
+                      'Failed to load: $error',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SliverToBoxAdapter(child: SizedBox(height: 12)),
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: BrainDuelSpacing.sm),
+            sliver: SliverToBoxAdapter(
+              child: TextButton(
+                onPressed: () => context.pushNamed(TriviaApp.nameSettings),
+                child: const Text(
+                  'Settings',
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
             ),
           ),
-          const SizedBox(height: 12),
-          TextButton(
-            onPressed: () => context.pushNamed(TriviaApp.nameSettings),
-            child: const Text(
-              'Settings',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
+          const SliverToBoxAdapter(child: SizedBox(height: 12)),
         ],
       ),
     );
@@ -258,72 +287,9 @@ class _ChallengeCarousel extends StatelessWidget {
           final challenge = challenges[index];
           return SizedBox(
             width: 210,
-            child: BDCard(
+            child: ChallengeCard(
+              challenge: challenge,
               onTap: () => onTap(challenge.id),
-              // Overflow-safe card layout: shrink-wrap the column and wrap
-              // badges so horizontal carousels don't clip card content.
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: BrainDuelColors.glacier.withValues(alpha: 0.12),
-                          borderRadius: const BorderRadius.all(BrainDuelRadii.sm),
-                        ),
-                        child: const Padding(
-                          padding: EdgeInsets.all(8),
-                          child: Icon(Icons.bolt, size: 20, color: BrainDuelColors.glacier),
-                        ),
-                      ),
-                      Chip(
-                        label: Text(
-                          challenge.badge,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    challenge.title,
-                    style: Theme.of(context).textTheme.titleSmall,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (challenge.subtitle.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      challenge.subtitle,
-                      style: Theme.of(context).textTheme.bodySmall,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      Chip(
-                        label: Text(
-                          challenge.timeRemaining,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      BDStatPill(label: 'Qs', value: '${challenge.questionCount}'),
-                      BDStatPill(label: 'Pts', value: '${challenge.points}'),
-                    ],
-                  ),
-                ],
-              ),
             ),
           );
         },

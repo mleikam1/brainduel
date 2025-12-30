@@ -8,6 +8,7 @@ import '../theme/brain_duel_theme.dart';
 import '../widgets/app_scaffold.dart';
 import '../widgets/bd_card.dart';
 import '../widgets/bd_stat_pill.dart';
+import '../widgets/challenge_card.dart';
 
 class SeasonalEventScreen extends ConsumerWidget {
   const SeasonalEventScreen({super.key});
@@ -121,62 +122,9 @@ class _EventChallengeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BDCard(
+    return ChallengeCard(
+      challenge: challenge,
       onTap: onTap,
-      // Overflow-safe card layout: shrink-wrapped column with wrapping badges
-      // so the card can grow vertically in lists.
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              Chip(
-                label: Text(
-                  challenge.badge,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            challenge.title,
-            style: Theme.of(context).textTheme.titleSmall,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-          if (challenge.subtitle.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text(
-              challenge.subtitle,
-              style: Theme.of(context).textTheme.bodySmall,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              Chip(
-                label: Text(
-                  challenge.timeRemaining,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              BDStatPill(label: 'Qs', value: '${challenge.questionCount}'),
-              BDStatPill(label: 'Pts', value: '${challenge.points}'),
-            ],
-          ),
-        ],
-      ),
     );
   }
 }
