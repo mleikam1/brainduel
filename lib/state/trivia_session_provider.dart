@@ -16,6 +16,7 @@ class TriviaGameState {
   final int score;
   final String? selectedAnswerId;
   final bool isAnswered;
+  final bool isTimedOut;
 
   const TriviaGameState({
     required this.loading,
@@ -25,6 +26,7 @@ class TriviaGameState {
     required this.score,
     required this.selectedAnswerId,
     required this.isAnswered,
+    required this.isTimedOut,
   });
 
   factory TriviaGameState.initial() => const TriviaGameState(
@@ -35,6 +37,7 @@ class TriviaGameState {
     score: 0,
     selectedAnswerId: null,
     isAnswered: false,
+    isTimedOut: false,
   );
 
   TriviaGameState copyWith({
@@ -45,6 +48,7 @@ class TriviaGameState {
     int? score,
     String? selectedAnswerId,
     bool? isAnswered,
+    bool? isTimedOut,
   }) {
     return TriviaGameState(
       loading: loading ?? this.loading,
@@ -54,6 +58,7 @@ class TriviaGameState {
       score: score ?? this.score,
       selectedAnswerId: selectedAnswerId ?? this.selectedAnswerId,
       isAnswered: isAnswered ?? this.isAnswered,
+      isTimedOut: isTimedOut ?? this.isTimedOut,
     );
   }
 }
@@ -116,6 +121,7 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
     state = state.copyWith(
       selectedAnswerId: answerId,
       isAnswered: true,
+      isTimedOut: false,
       score: correct ? state.score + 1 : state.score,
     );
 
@@ -145,7 +151,19 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
       currentIndex: state.currentIndex + 1,
       selectedAnswerId: null,
       isAnswered: false,
+      isTimedOut: false,
       error: null,
+    );
+  }
+
+  void timeoutQuestion() {
+    if (state.session == null) return;
+    if (state.isAnswered) return;
+
+    state = state.copyWith(
+      selectedAnswerId: null,
+      isAnswered: true,
+      isTimedOut: true,
     );
   }
 
