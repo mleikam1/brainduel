@@ -21,6 +21,9 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final categoriesAsync = ref.watch(categoriesProvider);
     final homeFeedAsync = ref.watch(homeFeedProvider);
+    final textScale = MediaQuery.textScaleFactorOf(context);
+    final carouselHeight = (188 + (textScale - 1) * 48).clamp(188, 240).toDouble();
+    final exploreHeight = (176 + (textScale - 1) * 48).clamp(176, 232).toDouble();
 
     return BDAppScaffold(
       title: 'Brain Duel',
@@ -37,13 +40,21 @@ class HomeScreen extends ConsumerWidget {
           BDCard(
             padding: const EdgeInsets.all(20),
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Welcome back, Alex', style: Theme.of(context).textTheme.titleMedium),
+                Text(
+                  'Welcome back, Alex',
+                  style: Theme.of(context).textTheme.titleMedium,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
                 const SizedBox(height: 6),
                 Text(
                   'Ranked streak: 4 wins',
                   style: Theme.of(context).textTheme.bodyMedium,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 16),
                 Wrap(
@@ -91,6 +102,7 @@ class HomeScreen extends ConsumerWidget {
                   const SizedBox(height: 12),
                   _ChallengeCarousel(
                     challenges: homeFeed.dailyChallenges,
+                    height: carouselHeight,
                     onTap: (challengeId) => context.pushNamed(
                       TriviaApp.nameChallengeIntro,
                       pathParameters: {'challengeId': challengeId},
@@ -108,6 +120,7 @@ class HomeScreen extends ConsumerWidget {
                   const SizedBox(height: 12),
                   _ChallengeCarousel(
                     challenges: homeFeed.trendingChallenges,
+                    height: carouselHeight,
                     onTap: (challengeId) => context.pushNamed(
                       TriviaApp.nameChallengeIntro,
                       pathParameters: {'challengeId': challengeId},
@@ -117,7 +130,13 @@ class HomeScreen extends ConsumerWidget {
               );
             },
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (error, _) => Center(child: Text('Failed to load: $error')),
+            error: (error, _) => Center(
+              child: Text(
+                'Failed to load: $error',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           ),
           const SizedBox(height: 20),
           _SectionHeader(
@@ -127,7 +146,7 @@ class HomeScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 12),
           SizedBox(
-            height: 176,
+            height: exploreHeight,
             child: categoriesAsync.when(
               data: (categories) {
                 return ListView.separated(
@@ -154,13 +173,23 @@ class HomeScreen extends ConsumerWidget {
                 );
               },
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (error, _) => Center(child: Text('Failed to load: $error')),
+              error: (error, _) => Center(
+                child: Text(
+                  'Failed to load: $error',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 12),
           TextButton(
             onPressed: () => context.pushNamed(TriviaApp.nameSettings),
-            child: const Text('Settings'),
+            child: const Text(
+              'Settings',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ],
       ),
@@ -185,12 +214,21 @@ class _SectionHeader extends StatelessWidget {
     return Row(
       children: [
         Expanded(
-          child: Text(title, style: Theme.of(context).textTheme.titleMedium),
+          child: Text(
+            title,
+            style: Theme.of(context).textTheme.titleMedium,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
         if (hasAction)
           TextButton(
             onPressed: onAction,
-            child: Text(actionLabel!),
+            child: Text(
+              actionLabel!,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
       ],
     );
@@ -200,16 +238,18 @@ class _SectionHeader extends StatelessWidget {
 class _ChallengeCarousel extends StatelessWidget {
   const _ChallengeCarousel({
     required this.challenges,
+    required this.height,
     required this.onTap,
   });
 
   final List<HomeChallenge> challenges;
+  final double height;
   final void Function(String challengeId) onTap;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 188,
+      height: height,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: challenges.length,
@@ -220,10 +260,17 @@ class _ChallengeCarousel extends StatelessWidget {
             width: 210,
             child: BDCard(
               onTap: () => onTap(challenge.id),
+              // RenderFlex overflow diagnosis: a Spacer inside a fixed-height
+              // carousel card pushed content past bounds. Fix by shrink-wrapping
+              // the column and allowing badge rows to wrap.
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       Container(
                         height: 38,
@@ -234,24 +281,35 @@ class _ChallengeCarousel extends StatelessWidget {
                         ),
                         child: const Icon(Icons.bolt, size: 20, color: BrainDuelColors.glacier),
                       ),
-                      const Spacer(),
-                      Chip(label: Text(challenge.badge)),
+                      Chip(
+                        label: Text(
+                          challenge.badge,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 12),
                   Text(
                     challenge.title,
                     style: Theme.of(context).textTheme.titleSmall,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
                   Text(
                     challenge.subtitle,
                     style: Theme.of(context).textTheme.bodySmall,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  const Spacer(),
+                  const SizedBox(height: 12),
                   Text(
                     challenge.timeRemaining,
                     style: Theme.of(context).textTheme.labelLarge,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 8),
                   Wrap(
@@ -312,16 +370,21 @@ class _SeasonalEventBanner extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     event.title,
                     style: Theme.of(context).textTheme.titleSmall,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
                   Text(
                     event.description,
                     style: Theme.of(context).textTheme.bodySmall,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 12),
                   Wrap(

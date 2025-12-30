@@ -41,7 +41,13 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
                 const SizedBox(height: 16),
                 Expanded(
                   child: filtered.isEmpty
-                      ? const Center(child: Text('No categories found.'))
+                      ? const Center(
+                          child: Text(
+                            'No categories found.',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        )
                       : GridView.builder(
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 2,
@@ -77,11 +83,19 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Failed to load categories: $e'),
+              Text(
+                'Failed to load categories: $e',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
               const SizedBox(height: 12),
               FilledButton(
                 onPressed: () => ref.refresh(categoriesProvider),
-                child: const Text('Retry'),
+                child: const Text(
+                  'Retry',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               )
             ],
           ),

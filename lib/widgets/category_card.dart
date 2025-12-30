@@ -24,7 +24,11 @@ class CategoryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return BDCard(
       onTap: onTap,
+      // RenderFlex overflow diagnosis: a Spacer inside a grid-constrained card
+      // forced stat pills below the visible bounds. Fix by shrink-wrapping the
+      // column and letting pills wrap within available space.
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
@@ -35,17 +39,29 @@ class CategoryCard extends StatelessWidget {
               borderRadius: const BorderRadius.all(BrainDuelRadii.sm),
             ),
             child: Center(
-              child: Text(category.icon, style: const TextStyle(fontSize: 22)),
+              child: Text(
+                category.icon,
+                style: const TextStyle(fontSize: 22),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ),
           const SizedBox(height: 12),
           Text(
             category.title,
             style: Theme.of(context).textTheme.titleSmall,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 4),
-          Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
-          const Spacer(),
+          Text(
+            subtitle,
+            style: Theme.of(context).textTheme.bodySmall,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 12),
           Wrap(
             spacing: 6,
             runSpacing: 6,
