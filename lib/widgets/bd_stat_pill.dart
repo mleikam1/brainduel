@@ -22,7 +22,11 @@ class BDStatPill extends StatelessWidget {
             Icon(icon, size: 14),
             const SizedBox(width: 4),
           ],
-          Text('$value $label'),
+          Text(
+            '$value $label',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
         ],
       ),
     );
