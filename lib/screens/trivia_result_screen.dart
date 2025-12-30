@@ -156,6 +156,7 @@ class _ChallengeResultViewState extends ConsumerState<ChallengeResultView> with 
   @override
   void initState() {
     super.initState();
+    ref.read(rematchProvider.notifier).loadChallenge(widget.result.challengeId);
     _pointsController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 900),
@@ -192,6 +193,7 @@ class _ChallengeResultViewState extends ConsumerState<ChallengeResultView> with 
     final seconds = widget.result.completionTime.inSeconds.remainder(60);
     final rankDelta = widget.result.rankDelta;
     final metadataAsync = ref.watch(challengeMetadataProvider(widget.result.challengeId));
+    final rematchState = ref.watch(rematchProvider);
 
     return BDAppScaffold(
       title: 'Results',
@@ -303,6 +305,8 @@ class _ChallengeResultViewState extends ConsumerState<ChallengeResultView> with 
               ),
             ),
             const SizedBox(height: 10),
+            _RematchPanel(state: rematchState),
+            const SizedBox(height: 10),
             BDSecondaryButton(
               label: 'Back to Home',
               isExpanded: true,
@@ -324,4 +328,103 @@ String _deltaLabel(int delta) {
 IconData _deltaIcon(int delta) {
   if (delta == 0) return Icons.remove;
   return delta > 0 ? Icons.arrow_upward : Icons.arrow_downward;
+}
+
+class _RematchPanel extends ConsumerWidget {
+  const _RematchPanel({required this.state});
+
+  final RematchState state;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final notifier = ref.read(rematchProvider.notifier);
+    final request = state.request;
+    final challengerAccepted = request?.challengerAccepted ?? false;
+    final opponentAccepted = request?.opponentAccepted ?? false;
+    final isReady = state.status == RematchStatus.ready;
+
+    return BDCard(
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('Rematch', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          Text(
+            'Both players must accept to start a fresh challenge.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 12),
+          if (state.status == RematchStatus.idle) ...[
+            BDPrimaryButton(
+              label: 'Request Rematch',
+              isExpanded: true,
+              onPressed: notifier.requestRematch,
+            ),
+          ] else if (state.status == RematchStatus.requesting) ...[
+            const Center(child: CircularProgressIndicator()),
+          ] else if (state.status == RematchStatus.error) ...[
+            Text(
+              state.error ?? 'Unable to start a rematch.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.redAccent),
+            ),
+            const SizedBox(height: 8),
+            BDSecondaryButton(
+              label: 'Try Again',
+              isExpanded: true,
+              onPressed: notifier.requestRematch,
+            ),
+          ] else ...[
+            Row(
+              children: [
+                Icon(
+                  challengerAccepted ? Icons.check_circle : Icons.hourglass_bottom,
+                  color: challengerAccepted ? Colors.green : Colors.orange,
+                  size: 18,
+                ),
+                const SizedBox(width: 8),
+                const Expanded(child: Text('You')),
+                Text(challengerAccepted ? 'Accepted' : 'Pending'),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Icon(
+                  opponentAccepted ? Icons.check_circle : Icons.hourglass_bottom,
+                  color: opponentAccepted ? Colors.green : Colors.orange,
+                  size: 18,
+                ),
+                const SizedBox(width: 8),
+                const Expanded(child: Text('Opponent')),
+                Text(opponentAccepted ? 'Accepted' : 'Pending'),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (!opponentAccepted)
+              BDSecondaryButton(
+                label: 'Simulate Opponent Accept',
+                isExpanded: true,
+                onPressed: notifier.acceptForOpponent,
+              ),
+            if (isReady) ...[
+              const SizedBox(height: 8),
+              BDPrimaryButton(
+                label: 'Start Rematch',
+                isExpanded: true,
+                onPressed: () {
+                  final rematchId = notifier.consumeReadyRematchId();
+                  if (rematchId == null) return;
+                  context.goNamed(
+                    TriviaApp.nameChallengeIntro,
+                    pathParameters: {'challengeId': rematchId},
+                  );
+                },
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
 }

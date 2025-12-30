@@ -3,6 +3,7 @@ import 'dart:math';
 import '../models/challenge.dart';
 import '../models/challenge_answer_record.dart';
 import '../models/challenge_result.dart';
+import '../models/rematch.dart';
 import 'content_cache_service.dart';
 import 'storage_content_service.dart';
 
@@ -27,6 +28,32 @@ class ChallengeService {
       challengeId: definition.metadata.id,
       startedAt: DateTime.now().toUtc(),
       questions: definition.questions,
+    );
+  }
+
+  Future<RematchRequest> createRematchRequest({
+    required String originalChallengeId,
+    required int rematchIndex,
+  }) async {
+    final rematchChallengeId = _buildRematchId(originalChallengeId, rematchIndex);
+    final definition = await _buildRematchDefinition(
+      originalChallengeId: originalChallengeId,
+      rematchChallengeId: rematchChallengeId,
+      rematchIndex: rematchIndex,
+    );
+    final cacheKey = 'challenge_$rematchChallengeId';
+    cache.setCachedContent(
+      key: cacheKey,
+      version: 1,
+      value: json.encode(definition.toJson()),
+    );
+    return RematchRequest(
+      id: 'rematch_${originalChallengeId}_$rematchIndex',
+      originalChallengeId: originalChallengeId,
+      rematchChallengeId: rematchChallengeId,
+      createdAt: DateTime.now().toUtc(),
+      challengerAccepted: true,
+      opponentAccepted: false,
     );
   }
 
@@ -71,5 +98,45 @@ class ChallengeService {
     );
     final decoded = json.decode(jsonText) as Map<String, dynamic>;
     return ChallengeDefinition.fromJson(decoded);
+  }
+
+  Future<ChallengeDefinition> _buildRematchDefinition({
+    required String originalChallengeId,
+    required String rematchChallengeId,
+    required int rematchIndex,
+  }) async {
+    final sourceId = _pickRematchSourceId(
+      originalChallengeId: originalChallengeId,
+      rematchIndex: rematchIndex,
+    );
+    final source = await _fetchDefinition(sourceId);
+    final metadata = ChallengeMetadata(
+      id: rematchChallengeId,
+      title: 'Rematch: ${source.metadata.title}',
+      topic: source.metadata.topic,
+      difficulty: source.metadata.difficulty,
+      rules: source.metadata.rules,
+      taunt: source.metadata.taunt,
+      expiresAt: source.metadata.expiresAt,
+    );
+    return ChallengeDefinition(metadata: metadata, questions: source.questions);
+  }
+
+  String _pickRematchSourceId({
+    required String originalChallengeId,
+    required int rematchIndex,
+  }) {
+    final available = storage.listChallengeIds();
+    final candidates = available.where((id) => id != originalChallengeId).toList();
+    if (candidates.isEmpty) {
+      throw StateError('No alternate challenges available for rematch.');
+    }
+    final seed = originalChallengeId.hashCode ^ rematchIndex.hashCode;
+    final selected = candidates[seed.abs() % candidates.length];
+    return selected;
+  }
+
+  String _buildRematchId(String originalChallengeId, int rematchIndex) {
+    return 'rematch_${originalChallengeId}_${rematchIndex + 1}';
   }
 }

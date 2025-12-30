@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/challenge.dart';
 import '../models/challenge_answer_record.dart';
 import '../models/challenge_result.dart';
+import '../models/rematch.dart';
 import '../services/challenge_service.dart';
 import 'categories_provider.dart';
 
@@ -277,4 +278,107 @@ class ChallengeAttemptNotifier extends StateNotifier<ChallengeAttemptState> {
   }
 
   int _clampAnswerTime(int value) => value.clamp(0, answerDurationMs);
+}
+
+enum RematchStatus { idle, requesting, pending, ready, error }
+
+class RematchState {
+  final String? challengeId;
+  final RematchStatus status;
+  final RematchRequest? request;
+  final String? error;
+
+  const RematchState({
+    required this.challengeId,
+    required this.status,
+    required this.request,
+    required this.error,
+  });
+
+  factory RematchState.initial() => const RematchState(
+        challengeId: null,
+        status: RematchStatus.idle,
+        request: null,
+        error: null,
+      );
+
+  RematchState copyWith({
+    String? challengeId,
+    RematchStatus? status,
+    RematchRequest? request,
+    String? error,
+  }) {
+    return RematchState(
+      challengeId: challengeId ?? this.challengeId,
+      status: status ?? this.status,
+      request: request ?? this.request,
+      error: error,
+    );
+  }
+}
+
+final rematchProvider = StateNotifierProvider<RematchNotifier, RematchState>((ref) {
+  return RematchNotifier(ref);
+});
+
+class RematchNotifier extends StateNotifier<RematchState> {
+  RematchNotifier(this.ref) : super(RematchState.initial());
+
+  final Ref ref;
+  final Map<String, int> _rematchCounts = {};
+
+  void loadChallenge(String challengeId) {
+    if (state.challengeId == challengeId) return;
+    state = RematchState.initial().copyWith(challengeId: challengeId);
+  }
+
+  Future<void> requestRematch() async {
+    final challengeId = state.challengeId;
+    if (challengeId == null) return;
+    state = state.copyWith(status: RematchStatus.requesting, error: null);
+    final index = _rematchCounts[challengeId] ?? 0;
+    try {
+      final request = await ref.read(challengeServiceProvider).createRematchRequest(
+            originalChallengeId: challengeId,
+            rematchIndex: index,
+          );
+      _rematchCounts[challengeId] = index + 1;
+      state = state.copyWith(
+        status: RematchStatus.pending,
+        request: request,
+      );
+    } catch (e) {
+      state = state.copyWith(status: RematchStatus.error, error: e.toString());
+    }
+  }
+
+  void acceptForChallenger() {
+    final request = state.request;
+    if (request == null) return;
+    final updated = request.copyWith(challengerAccepted: true);
+    _applyAcceptance(updated);
+  }
+
+  void acceptForOpponent() {
+    final request = state.request;
+    if (request == null) return;
+    final updated = request.copyWith(opponentAccepted: true);
+    _applyAcceptance(updated);
+  }
+
+  String? consumeReadyRematchId() {
+    final request = state.request;
+    if (state.status != RematchStatus.ready || request == null) return null;
+    final rematchId = request.rematchChallengeId;
+    state = RematchState.initial().copyWith(challengeId: state.challengeId);
+    return rematchId;
+  }
+
+  void _applyAcceptance(RematchRequest updated) {
+    final ready = updated.challengerAccepted && updated.opponentAccepted;
+    state = state.copyWith(
+      request: updated,
+      status: ready ? RematchStatus.ready : RematchStatus.pending,
+    );
+  }
 }

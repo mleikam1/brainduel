@@ -29,6 +29,16 @@ class ChallengeMetadata {
       expiresAt: DateTime.parse(json['expiresAt'] as String),
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'title': title,
+        'topic': topic,
+        'difficulty': difficulty,
+        'rules': rules,
+        'taunt': taunt,
+        'expiresAt': expiresAt.toUtc().toIso8601String(),
+      };
 }
 
 class ChallengeChoice {
@@ -46,6 +56,11 @@ class ChallengeChoice {
       text: json['text'] as String,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'text': text,
+      };
 }
 
 class ChallengeQuestion {
@@ -71,6 +86,12 @@ class ChallengeQuestion {
       choices: choices,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'prompt': prompt,
+        'choices': choices.map((choice) => choice.toJson()).toList(),
+      };
 }
 
 class ChallengeDefinition {
@@ -89,6 +110,11 @@ class ChallengeDefinition {
       questions: questionsJson.map(ChallengeQuestion.fromJson).toList(),
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        ...metadata.toJson(),
+        'questions': questions.map((question) => question.toJson()).toList(),
+      };
 }
 
 class ChallengeAttempt {
