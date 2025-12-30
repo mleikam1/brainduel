@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../app.dart';
 import '../state/trivia_session_provider.dart';
 import '../state/user_stats_provider.dart';
@@ -85,9 +86,9 @@ class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> {
       categoryId: session.categoryId,
     );
 
-    Navigator.of(context).pushReplacementNamed(
-      TriviaApp.routeResults,
-      arguments: {
+    context.goNamed(
+      TriviaApp.nameResults,
+      extra: {
         'categoryId': session.categoryId,
         'correct': correct,
         'total': total,

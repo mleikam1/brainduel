@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../app.dart';
 import '../state/categories_provider.dart';
 import '../theme/brain_duel_theme.dart';
@@ -99,9 +100,9 @@ class CategoryDetailScreen extends ConsumerWidget {
               BDPrimaryButton(
                 label: 'Play Solo',
                 isExpanded: true,
-                onPressed: () => Navigator.of(context).pushNamed(
-                  TriviaApp.routeGame,
-                  arguments: category.id,
+                onPressed: () => context.pushNamed(
+                  TriviaApp.nameGame,
+                  extra: category.id,
                 ),
               ),
               const SizedBox(height: 10),
