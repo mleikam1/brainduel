@@ -75,7 +75,7 @@ class HomeScreen extends ConsumerWidget {
                   label: 'Duel a Friend',
                   icon: Icons.people,
                   isExpanded: true,
-                  onPressed: null,
+                  onPressed: () => context.pushNamed(TriviaApp.nameFriends),
                 ),
               ),
             ],

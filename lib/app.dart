@@ -4,6 +4,8 @@ import 'models/challenge.dart';
 import 'screens/categories_screen.dart';
 import 'screens/category_detail_screen.dart';
 import 'screens/challenge_intro_screen.dart';
+import 'screens/follow_link_screen.dart';
+import 'screens/friends_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/profile_stats_screen.dart';
@@ -22,6 +24,7 @@ class TriviaApp extends StatelessWidget {
   static const routeCategories = '/categories';
   static const routeCategoryDetail = '/categories/detail';
   static const routeTopicSelect = '/topics';
+  static const routeFriends = '/friends';
   static const routeGame = '/game';
   static const routeResults = '/results';
   static const routeProfile = '/profile';
@@ -32,12 +35,14 @@ class TriviaApp extends StatelessWidget {
   static const nameCategories = 'categories';
   static const nameCategoryDetail = 'categoryDetail';
   static const nameTopicSelect = 'topicSelect';
+  static const nameFriends = 'friends';
   static const nameGame = 'game';
   static const nameResults = 'results';
   static const nameProfile = 'profile';
   static const nameSettings = 'settings';
   static const nameChallengeIntro = 'challengeIntro';
   static const nameQuestionFlow = 'questionFlow';
+  static const nameFollowLink = 'followLink';
 
   static final GoRouter _router = GoRouter(
     initialLocation: routeOnboarding,
@@ -60,6 +65,11 @@ class TriviaApp extends StatelessWidget {
         path: routeTopicSelect,
         name: nameTopicSelect,
         builder: (context, state) => const TopicSelectScreen(),
+      ),
+      GoRoute(
+        path: routeFriends,
+        name: nameFriends,
+        builder: (context, state) => const FriendsScreen(),
       ),
       GoRoute(
         path: routeCategories,
@@ -102,6 +112,14 @@ class TriviaApp extends StatelessWidget {
         path: routeSettings,
         name: nameSettings,
         builder: (context, state) => const SettingsScreen(),
+      ),
+      GoRoute(
+        path: '/f/:followCode',
+        name: nameFollowLink,
+        builder: (context, state) {
+          final followCode = state.pathParameters['followCode'] ?? '';
+          return FollowLinkScreen(followCode: followCode);
+        },
       ),
       GoRoute(
         path: '/c/:challengeId',
