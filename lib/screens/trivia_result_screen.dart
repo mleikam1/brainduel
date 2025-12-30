@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../app.dart';
 import '../models/challenge_result.dart';
 import '../models/leaderboard_entry.dart';
+import '../state/challenge_providers.dart';
+import '../state/share_providers.dart';
 import '../theme/brain_duel_theme.dart';
 import '../widgets/app_scaffold.dart';
 import '../widgets/bd_avatar.dart';
@@ -134,16 +137,16 @@ class TriviaResultScreen extends StatelessWidget {
   }
 }
 
-class ChallengeResultView extends StatefulWidget {
+class ChallengeResultView extends ConsumerStatefulWidget {
   const ChallengeResultView({super.key, required this.result});
 
   final ChallengeResult result;
 
   @override
-  State<ChallengeResultView> createState() => _ChallengeResultViewState();
+  ConsumerState<ChallengeResultView> createState() => _ChallengeResultViewState();
 }
 
-class _ChallengeResultViewState extends State<ChallengeResultView> with TickerProviderStateMixin {
+class _ChallengeResultViewState extends ConsumerState<ChallengeResultView> with TickerProviderStateMixin {
   late final AnimationController _pointsController;
   late final AnimationController _percentileController;
   late final Animation<int> _pointsAnimation;
@@ -188,6 +191,7 @@ class _ChallengeResultViewState extends State<ChallengeResultView> with TickerPr
     final minutes = widget.result.completionTime.inMinutes;
     final seconds = widget.result.completionTime.inSeconds.remainder(60);
     final rankDelta = widget.result.rankDelta;
+    final metadataAsync = ref.watch(challengeMetadataProvider(widget.result.challengeId));
 
     return BDAppScaffold(
       title: 'Results',
@@ -284,11 +288,19 @@ class _ChallengeResultViewState extends State<ChallengeResultView> with TickerPr
               label: 'Share Results',
               icon: Icons.share,
               isExpanded: true,
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Share hook ready for integration.')),
-                );
-              },
+              onPressed: metadataAsync.when(
+                data: (metadata) => () => ref.read(shareServiceProvider).shareChallengeResult(
+                      context: context,
+                      result: widget.result,
+                      metadata: metadata,
+                    ),
+                loading: () => null,
+                error: (_, __) => () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Unable to load share details.')),
+                  );
+                },
+              ),
             ),
             const SizedBox(height: 10),
             BDSecondaryButton(
