@@ -98,7 +98,10 @@ class HomeScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 20),
                   if (seasonalEvent != null) ...[
-                    _SeasonalEventBanner(event: seasonalEvent),
+                    _SeasonalEventBanner(
+                      event: seasonalEvent,
+                      onTap: () => context.pushNamed(TriviaApp.nameSeasonalEvent),
+                    ),
                     const SizedBox(height: 20),
                   ],
                   _SectionHeader(title: 'Trending Public Challenges'),
@@ -270,14 +273,19 @@ class _ChallengeCarousel extends StatelessWidget {
 }
 
 class _SeasonalEventBanner extends StatelessWidget {
-  const _SeasonalEventBanner({required this.event});
+  const _SeasonalEventBanner({
+    required this.event,
+    this.onTap,
+  });
 
   final SeasonalEvent event;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     return BDCard(
       padding: EdgeInsets.zero,
+      onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -326,6 +334,11 @@ class _SeasonalEventBanner extends StatelessWidget {
                   ),
                 ],
               ),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              Icons.chevron_right,
+              color: BrainDuelColors.textMuted,
             ),
           ],
         ),

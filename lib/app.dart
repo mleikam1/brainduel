@@ -10,6 +10,7 @@ import 'screens/home_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/profile_stats_screen.dart';
 import 'screens/question_screen.dart';
+import 'screens/seasonal_event_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/topic_select_screen.dart';
 import 'screens/trivia_game_screen.dart';
@@ -29,6 +30,7 @@ class TriviaApp extends StatelessWidget {
   static const routeResults = '/results';
   static const routeProfile = '/profile';
   static const routeSettings = '/settings';
+  static const routeSeasonalEvent = '/events/seasonal';
 
   static const nameOnboarding = 'onboarding';
   static const nameHome = 'home';
@@ -40,6 +42,7 @@ class TriviaApp extends StatelessWidget {
   static const nameResults = 'results';
   static const nameProfile = 'profile';
   static const nameSettings = 'settings';
+  static const nameSeasonalEvent = 'seasonalEvent';
   static const nameChallengeIntro = 'challengeIntro';
   static const nameQuestionFlow = 'questionFlow';
   static const nameFollowLink = 'followLink';
@@ -112,6 +115,11 @@ class TriviaApp extends StatelessWidget {
         path: routeSettings,
         name: nameSettings,
         builder: (context, state) => const SettingsScreen(),
+      ),
+      GoRoute(
+        path: routeSeasonalEvent,
+        name: nameSeasonalEvent,
+        builder: (context, state) => const SeasonalEventScreen(),
       ),
       GoRoute(
         path: '/f/:followCode',
