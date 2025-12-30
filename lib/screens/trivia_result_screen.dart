@@ -11,6 +11,7 @@ import '../widgets/app_scaffold.dart';
 import '../widgets/bd_avatar.dart';
 import '../widgets/bd_buttons.dart';
 import '../widgets/bd_card.dart';
+import '../widgets/bd_stat_pill.dart';
 import '../widgets/score_summary.dart';
 
 class TriviaResultScreen extends StatelessWidget {
