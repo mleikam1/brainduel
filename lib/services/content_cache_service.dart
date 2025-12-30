@@ -27,4 +27,13 @@ class ContentCacheService {
     _cache.clear();
     _versions.clear();
   }
+
+  void setCachedContent({
+    required String key,
+    required int version,
+    required String value,
+  }) {
+    _cache[key] = value;
+    _versions[key] = version;
+  }
 }

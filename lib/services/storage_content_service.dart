@@ -8,6 +8,15 @@ class StorageContentService {
     return jsonEncode(_demoContent[path] ?? _demoContent['categories']!);
   }
 
+  List<String> listChallengeIds() {
+    final ids = _demoContent.keys
+        .where((key) => key.startsWith('challenge_'))
+        .map((key) => key.replaceFirst('challenge_', ''))
+        .toList();
+    ids.sort();
+    return ids;
+  }
+
   static final Map<String, Object> _demoContent = {
     'categories': {
       'version': 1,
