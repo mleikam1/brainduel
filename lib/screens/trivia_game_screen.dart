@@ -30,15 +30,19 @@ class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     categoryId ??= ModalRoute.of(context)?.settings.arguments as String?;
-    if (categoryId != null && !_started) {
-      ref.read(triviaSessionProvider.notifier).startGame(categoryId!);
-      _started = true;
-    }
   }
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      categoryId ??= ModalRoute.of(context)?.settings.arguments as String?;
+      if (categoryId != null && !_started) {
+        ref.read(triviaSessionProvider.notifier).startGame(categoryId!);
+        _started = true;
+      }
+    });
     _sessionSubscription = ref.listenManual(triviaSessionProvider, (previous, next) {
       if (next.session != null && previous?.currentIndex != next.currentIndex) {
         _resetTimer();

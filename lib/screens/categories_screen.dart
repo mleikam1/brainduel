@@ -27,61 +27,62 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
       child: asyncCats.when(
         data: (cats) {
           final filtered = cats.where((c) => c.title.toLowerCase().contains(_query.toLowerCase())).toList();
-          return LayoutBuilder(
-            builder: (context, constraints) {
-              const spacing = 12.0;
-              final columnCount = (constraints.maxWidth / 220).floor().clamp(1, 3).toInt();
-              final totalSpacing = spacing * (columnCount - 1);
-              final cardWidth = (constraints.maxWidth - totalSpacing) / columnCount;
-
-              return SingleChildScrollView(
+          return CustomScrollView(
+            slivers: [
+              SliverPadding(
                 padding: const EdgeInsets.all(BrainDuelSpacing.sm),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(
-                      decoration: const InputDecoration(
-                        hintText: 'Search categories',
-                        prefixIcon: Icon(Icons.search),
-                      ),
-                      onChanged: (value) => setState(() => _query = value),
+                sliver: SliverToBoxAdapter(
+                  child: TextField(
+                    decoration: const InputDecoration(
+                      hintText: 'Search categories',
+                      prefixIcon: Icon(Icons.search),
                     ),
-                    const SizedBox(height: 16),
-                    if (filtered.isEmpty)
-                      const Center(
-                        child: Text(
-                          'No categories found.',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      )
-                    else
-                      Wrap(
-                        spacing: spacing,
-                        runSpacing: spacing,
-                        children: filtered.map((c) {
-                          final detail = ref.read(categoryDetailProvider(c));
-                          return SizedBox(
-                            width: cardWidth,
-                            child: CategoryCard(
-                              category: c,
-                              subtitle: detail.subtitle,
-                              points: detail.points,
-                              questionCount: detail.questionCount,
-                              onTap: () {
-                                context.pushNamed(
-                                  TriviaApp.nameCategoryDetail,
-                                  extra: c.id,
-                                );
-                              },
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                  ],
+                    onChanged: (value) => setState(() => _query = value),
+                  ),
                 ),
-              );
-            },
+              ),
+              if (filtered.isEmpty)
+                const SliverToBoxAdapter(
+                  child: Center(
+                    child: Text(
+                      'No categories found.',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                )
+              else
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: BrainDuelSpacing.sm),
+                  sliver: SliverGrid(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        final category = filtered[index];
+                        final detail = ref.read(categoryDetailProvider(category));
+                        return CategoryCard(
+                          category: category,
+                          subtitle: detail.subtitle,
+                          points: detail.points,
+                          questionCount: detail.questionCount,
+                          onTap: () {
+                            context.pushNamed(
+                              TriviaApp.nameCategoryDetail,
+                              extra: category.id,
+                            );
+                          },
+                        );
+                      },
+                      childCount: filtered.length,
+                    ),
+                    gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                      maxCrossAxisExtent: 220,
+                      mainAxisSpacing: 16,
+                      crossAxisSpacing: 16,
+                    ),
+                  ),
+                ),
+              const SliverToBoxAdapter(child: SizedBox(height: 16)),
+            ],
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
