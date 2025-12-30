@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/challenge.dart';
+import '../models/challenge_answer_record.dart';
+import '../models/challenge_result.dart';
 import '../services/challenge_service.dart';
 import 'categories_provider.dart';
 
@@ -19,6 +21,9 @@ class ChallengeAttemptState {
   final bool loading;
   final String? error;
   final ChallengeAttempt? attempt;
+  final bool submitting;
+  final bool submitted;
+  final String? submissionError;
   final int currentIndex;
   final Map<String, ChallengeAnswerRecord> answerRecords;
   final QuestionPhase phase;
@@ -29,6 +34,9 @@ class ChallengeAttemptState {
     required this.loading,
     required this.error,
     required this.attempt,
+    required this.submitting,
+    required this.submitted,
+    required this.submissionError,
     required this.currentIndex,
     required this.answerRecords,
     required this.phase,
@@ -40,6 +48,9 @@ class ChallengeAttemptState {
     loading: false,
     error: null,
     attempt: null,
+    submitting: false,
+    submitted: false,
+    submissionError: null,
     currentIndex: 0,
     answerRecords: {},
     phase: QuestionPhase.reading,
@@ -51,6 +62,9 @@ class ChallengeAttemptState {
     bool? loading,
     String? error,
     ChallengeAttempt? attempt,
+    bool? submitting,
+    bool? submitted,
+    String? submissionError,
     int? currentIndex,
     Map<String, ChallengeAnswerRecord>? answerRecords,
     QuestionPhase? phase,
@@ -61,6 +75,9 @@ class ChallengeAttemptState {
       loading: loading ?? this.loading,
       error: error,
       attempt: attempt ?? this.attempt,
+      submitting: submitting ?? this.submitting,
+      submitted: submitted ?? this.submitted,
+      submissionError: submissionError,
       currentIndex: currentIndex ?? this.currentIndex,
       answerRecords: answerRecords ?? this.answerRecords,
       phase: phase ?? this.phase,
@@ -71,18 +88,6 @@ class ChallengeAttemptState {
 }
 
 enum QuestionPhase { reading, answering, locked }
-
-class ChallengeAnswerRecord {
-  final int? choiceIndex;
-  final String? choiceId;
-  final int answerTimeMs;
-
-  const ChallengeAnswerRecord({
-    required this.choiceIndex,
-    required this.choiceId,
-    required this.answerTimeMs,
-  });
-}
 
 final challengeAttemptProvider =
 StateNotifierProvider<ChallengeAttemptNotifier, ChallengeAttemptState>((ref) {
@@ -159,6 +164,10 @@ class ChallengeAttemptNotifier extends StateNotifier<ChallengeAttemptState> {
     return state.currentIndex >= attempt.questions.length - 1;
   }
 
+  bool get canSubmit {
+    return state.phase == QuestionPhase.locked && isLastQuestion && !state.submitting;
+  }
+
   void nextQuestion() {
     final attempt = state.attempt;
     if (attempt == null) return;
@@ -177,6 +186,24 @@ class ChallengeAttemptNotifier extends StateNotifier<ChallengeAttemptState> {
   void reset() {
     _stopTimers();
     state = ChallengeAttemptState.initial();
+  }
+
+  Future<ChallengeResult?> submitAttempt() async {
+    final attempt = state.attempt;
+    if (attempt == null) return null;
+    if (state.submitting || state.submitted) return null;
+    state = state.copyWith(submitting: true, submissionError: null);
+    try {
+      final result = await ref.read(challengeServiceProvider).submitAttempt(
+        attempt: attempt,
+        answers: state.answerRecords,
+      );
+      state = state.copyWith(submitting: false, submitted: true);
+      return result;
+    } catch (e) {
+      state = state.copyWith(submitting: false, submissionError: e.toString());
+      return null;
+    }
   }
 
   @override
