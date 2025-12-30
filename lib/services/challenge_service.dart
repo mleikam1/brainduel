@@ -86,7 +86,7 @@ class ChallengeService {
     final rng = Random(seed);
     final points = 900 + (answeredCount * 35) + rng.nextInt(350);
     final percentileThreshold = max(_percentileMinAnswerThreshold, (attempt.questions.length / 2).ceil());
-    final percentile = answeredCount >= percentileThreshold ? 62 + rng.nextDouble() * 30 : -1;
+    final percentile = answeredCount >= percentileThreshold ? 62.0 + rng.nextDouble() * 30 : -1.0;
     final rank = 1 + rng.nextInt(5);
     final rankDelta = rng.nextInt(5) - 2;
     final completionTime = DateTime.now().difference(attempt.startedAt);
