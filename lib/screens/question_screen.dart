@@ -134,8 +134,14 @@ class _QuestionScreenState extends ConsumerState<QuestionScreen> {
                         final result = await notifier.submitAttempt();
                         if (!mounted || result == null) {
                           if (mounted) {
+                            final submissionError =
+                                ref.read(challengeAttemptProvider).submissionError;
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Unable to submit attempt. Try again.')),
+                              SnackBar(
+                                content: Text(
+                                  submissionError ?? 'Unable to submit attempt. Try again.',
+                                ),
+                              ),
                             );
                           }
                           return;

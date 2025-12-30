@@ -152,6 +152,7 @@ class _ChallengeResultViewState extends ConsumerState<ChallengeResultView> with 
   late final Animation<int> _pointsAnimation;
   late final Animation<double> _percentileAnimation;
   bool _percentileReady = false;
+  bool get _hasPercentile => widget.result.percentile >= 0;
 
   @override
   void initState() {
@@ -173,11 +174,13 @@ class _ChallengeResultViewState extends ConsumerState<ChallengeResultView> with 
       CurvedAnimation(parent: _percentileController, curve: Curves.easeOutCubic),
     );
 
-    Future.delayed(const Duration(milliseconds: 350), () {
-      if (!mounted) return;
-      setState(() => _percentileReady = true);
-      _percentileController.forward();
-    });
+    if (_hasPercentile) {
+      Future.delayed(const Duration(milliseconds: 350), () {
+        if (!mounted) return;
+        setState(() => _percentileReady = true);
+        _percentileController.forward();
+      });
+    }
   }
 
   @override
@@ -237,7 +240,7 @@ class _ChallengeResultViewState extends ConsumerState<ChallengeResultView> with 
                         animation: _percentileAnimation,
                         builder: (context, _) => BDStatPill(
                           label: 'Percentile',
-                          value: _percentileReady
+                          value: _hasPercentile && _percentileReady
                               ? '${_percentileAnimation.value.toStringAsFixed(1)}%'
                               : 'Forming...',
                           icon: Icons.percent,

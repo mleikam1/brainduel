@@ -15,6 +15,12 @@ class ChallengeService {
 
   final StorageContentService storage;
   final ContentCacheService cache;
+  final Map<String, DateTime> _attemptStartTimestamps = {};
+  final Map<String, DateTime> _submissionTimestamps = {};
+
+  static const Duration _startAttemptRateLimit = Duration(seconds: 2);
+  static const Duration _submitAttemptRateLimit = Duration(seconds: 2);
+  static const int _percentileMinAnswerThreshold = 2;
 
   Future<ChallengeMetadata> fetchMetadata(String challengeId) async {
     final definition = await _fetchDefinition(challengeId);
@@ -22,7 +28,15 @@ class ChallengeService {
   }
 
   Future<ChallengeAttempt> startAttempt(String challengeId) async {
+    _enforceRateLimit(
+      timestamps: _attemptStartTimestamps,
+      key: challengeId,
+      window: _startAttemptRateLimit,
+    );
     final definition = await _fetchDefinition(challengeId);
+    if (_isPublicChallenge(definition.metadata) && _isExpired(definition.metadata)) {
+      throw ChallengeExpiredException(definition.metadata.expiresAt);
+    }
     return ChallengeAttempt(
       id: 'attempt_${definition.metadata.id}',
       challengeId: definition.metadata.id,
@@ -61,12 +75,18 @@ class ChallengeService {
     required ChallengeAttempt attempt,
     required Map<String, ChallengeAnswerRecord> answers,
   }) async {
+    _enforceRateLimit(
+      timestamps: _submissionTimestamps,
+      key: attempt.id,
+      window: _submitAttemptRateLimit,
+    );
     await Future.delayed(const Duration(milliseconds: 650));
     final answeredCount = answers.values.where((record) => record.choiceId != null).length;
     final seed = attempt.id.hashCode ^ attempt.challengeId.hashCode ^ answeredCount;
     final rng = Random(seed);
     final points = 900 + (answeredCount * 35) + rng.nextInt(350);
-    final percentile = 62 + rng.nextDouble() * 30;
+    final percentileThreshold = max(_percentileMinAnswerThreshold, (attempt.questions.length / 2).ceil());
+    final percentile = answeredCount >= percentileThreshold ? 62 + rng.nextDouble() * 30 : -1;
     final rank = 1 + rng.nextInt(5);
     final rankDelta = rng.nextInt(5) - 2;
     final completionTime = DateTime.now().difference(attempt.startedAt);
@@ -139,4 +159,43 @@ class ChallengeService {
   String _buildRematchId(String originalChallengeId, int rematchIndex) {
     return 'rematch_${originalChallengeId}_${rematchIndex + 1}';
   }
+
+  bool _isPublicChallenge(ChallengeMetadata metadata) => metadata.id.startsWith('public_');
+
+  bool _isExpired(ChallengeMetadata metadata) =>
+      metadata.expiresAt.isBefore(DateTime.now().toUtc());
+
+  void _enforceRateLimit({
+    required Map<String, DateTime> timestamps,
+    required String key,
+    required Duration window,
+  }) {
+    final now = DateTime.now().toUtc();
+    final last = timestamps[key];
+    if (last != null) {
+      final elapsed = now.difference(last);
+      if (elapsed < window) {
+        throw ChallengeRateLimitException(window - elapsed);
+      }
+    }
+    timestamps[key] = now;
+  }
+}
+
+class ChallengeExpiredException implements Exception {
+  ChallengeExpiredException(this.expiresAt);
+
+  final DateTime expiresAt;
+
+  @override
+  String toString() => 'Challenge expired at $expiresAt.';
+}
+
+class ChallengeRateLimitException implements Exception {
+  ChallengeRateLimitException([this.retryAfter]);
+
+  final Duration? retryAfter;
+
+  @override
+  String toString() => 'Rate limit hit. Retry after ${retryAfter?.inSeconds ?? 0}s.';
 }
