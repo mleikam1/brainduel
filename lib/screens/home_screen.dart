@@ -22,8 +22,8 @@ class HomeScreen extends ConsumerWidget {
     final categoriesAsync = ref.watch(categoriesProvider);
     final homeFeedAsync = ref.watch(homeFeedProvider);
     final textScale = MediaQuery.textScaleFactorOf(context);
-    final carouselHeight = (188 + (textScale - 1) * 48).clamp(188, 240).toDouble();
-    final exploreHeight = (176 + (textScale - 1) * 48).clamp(176, 232).toDouble();
+    final carouselHeight = (192 + (textScale - 1) * 72).clamp(192, 280).toDouble();
+    final exploreHeight = (184 + (textScale - 1) * 72).clamp(184, 260).toDouble();
 
     return BDAppScaffold(
       title: 'Brain Duel',
@@ -260,9 +260,8 @@ class _ChallengeCarousel extends StatelessWidget {
             width: 210,
             child: BDCard(
               onTap: () => onTap(challenge.id),
-              // RenderFlex overflow diagnosis: a Spacer inside a fixed-height
-              // carousel card pushed content past bounds. Fix by shrink-wrapping
-              // the column and allowing badge rows to wrap.
+              // Overflow-safe card layout: shrink-wrap the column and wrap
+              // badges so horizontal carousels don't clip card content.
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -272,14 +271,15 @@ class _ChallengeCarousel extends StatelessWidget {
                     runSpacing: 8,
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      Container(
-                        height: 38,
-                        width: 38,
+                      DecoratedBox(
                         decoration: BoxDecoration(
                           color: BrainDuelColors.glacier.withValues(alpha: 0.12),
                           borderRadius: const BorderRadius.all(BrainDuelRadii.sm),
                         ),
-                        child: const Icon(Icons.bolt, size: 20, color: BrainDuelColors.glacier),
+                        child: const Padding(
+                          padding: EdgeInsets.all(8),
+                          child: Icon(Icons.bolt, size: 20, color: BrainDuelColors.glacier),
+                        ),
                       ),
                       Chip(
                         label: Text(
@@ -290,32 +290,34 @@ class _ChallengeCarousel extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
                   Text(
                     challenge.title,
                     style: Theme.of(context).textTheme.titleSmall,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    challenge.subtitle,
-                    style: Theme.of(context).textTheme.bodySmall,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    challenge.timeRemaining,
-                    style: Theme.of(context).textTheme.labelLarge,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  if (challenge.subtitle.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      challenge.subtitle,
+                      style: Theme.of(context).textTheme.bodySmall,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                   const SizedBox(height: 8),
                   Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
+                    spacing: 8,
+                    runSpacing: 8,
                     children: [
+                      Chip(
+                        label: Text(
+                          challenge.timeRemaining,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                       BDStatPill(label: 'Qs', value: '${challenge.questionCount}'),
                       BDStatPill(label: 'Pts', value: '${challenge.points}'),
                     ],
@@ -358,14 +360,15 @@ class _SeasonalEventBanner extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              height: 44,
-              width: 44,
+            DecoratedBox(
               decoration: BoxDecoration(
                 color: BrainDuelColors.ember.withValues(alpha: 0.2),
                 borderRadius: const BorderRadius.all(BrainDuelRadii.sm),
               ),
-              child: const Icon(Icons.emoji_events, color: BrainDuelColors.ember),
+              child: const Padding(
+                padding: EdgeInsets.all(10),
+                child: Icon(Icons.emoji_events, color: BrainDuelColors.ember),
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(

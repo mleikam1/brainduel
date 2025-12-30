@@ -37,21 +37,23 @@ class CategoryDetailScreen extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      height: 150,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(18),
-                        gradient: LinearGradient(
-                          colors: [
-                            Theme.of(context).colorScheme.primary.withOpacity(0.2),
-                            Theme.of(context).colorScheme.primary.withOpacity(0.05),
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
+                    AspectRatio(
+                      aspectRatio: 16 / 9,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(18),
+                          gradient: LinearGradient(
+                            colors: [
+                              Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                              Theme.of(context).colorScheme.primary.withOpacity(0.05),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
                         ),
-                      ),
-                      child: Center(
-                        child: Text(category.icon, style: const TextStyle(fontSize: 48)),
+                        child: Center(
+                          child: Text(category.icon, style: const TextStyle(fontSize: 48)),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 16),
