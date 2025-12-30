@@ -24,6 +24,7 @@ class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> {
   static const int _questionSeconds = 40;
   int _remainingSeconds = _questionSeconds;
   bool _started = false;
+  late final ProviderSubscription _sessionSubscription;
 
   @override
   void didChangeDependencies() {
@@ -38,7 +39,7 @@ class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> {
   @override
   void initState() {
     super.initState();
-    ref.listen(triviaSessionProvider, (previous, next) {
+    _sessionSubscription = ref.listenManual(triviaSessionProvider, (previous, next) {
       if (next.session != null && previous?.currentIndex != next.currentIndex) {
         _resetTimer();
       }
@@ -50,6 +51,7 @@ class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> {
 
   @override
   void dispose() {
+    _sessionSubscription.close();
     _stopTimer();
     super.dispose();
   }
