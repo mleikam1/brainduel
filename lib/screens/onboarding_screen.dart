@@ -30,7 +30,7 @@ class OnboardingScreen extends StatelessWidget {
             BDPrimaryButton(
               label: 'Get Started',
               isExpanded: true,
-              onPressed: () => context.goNamed(TriviaApp.nameHome),
+              onPressed: () => context.goNamed(TriviaApp.nameTopicSelect),
             ),
           ],
         ),

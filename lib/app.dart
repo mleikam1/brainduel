@@ -7,6 +7,7 @@ import 'screens/home_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/profile_stats_screen.dart';
 import 'screens/settings_screen.dart';
+import 'screens/topic_select_screen.dart';
 import 'screens/trivia_game_screen.dart';
 import 'screens/trivia_result_screen.dart';
 import 'theme/brain_duel_theme.dart';
@@ -18,6 +19,7 @@ class TriviaApp extends StatelessWidget {
   static const routeHome = '/home';
   static const routeCategories = '/categories';
   static const routeCategoryDetail = '/categories/detail';
+  static const routeTopicSelect = '/topics';
   static const routeGame = '/game';
   static const routeResults = '/results';
   static const routeProfile = '/profile';
@@ -27,6 +29,7 @@ class TriviaApp extends StatelessWidget {
   static const nameHome = 'home';
   static const nameCategories = 'categories';
   static const nameCategoryDetail = 'categoryDetail';
+  static const nameTopicSelect = 'topicSelect';
   static const nameGame = 'game';
   static const nameResults = 'results';
   static const nameProfile = 'profile';
@@ -50,6 +53,11 @@ class TriviaApp extends StatelessWidget {
         path: routeHome,
         name: nameHome,
         builder: (context, state) => const HomeScreen(),
+      ),
+      GoRoute(
+        path: routeTopicSelect,
+        name: nameTopicSelect,
+        builder: (context, state) => const TopicSelectScreen(),
       ),
       GoRoute(
         path: routeCategories,
