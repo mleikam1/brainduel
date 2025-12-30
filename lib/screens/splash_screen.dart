@@ -35,7 +35,7 @@ class _SplashScreenState extends State<SplashScreen> {
             ? const Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('Trivia MVP', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
+            Text('Brain Duel', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
             SizedBox(height: 12),
             CircularProgressIndicator(),
           ],
