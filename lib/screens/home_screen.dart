@@ -219,7 +219,7 @@ class _ChallengeCarousel extends StatelessWidget {
           return SizedBox(
             width: 210,
             child: BDCard(
-              onTap: () => onTap(challenge.id as String),
+              onTap: () => onTap(challenge.id),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -229,28 +229,28 @@ class _ChallengeCarousel extends StatelessWidget {
                         height: 38,
                         width: 38,
                         decoration: BoxDecoration(
-                          color: BrainDuelColors.glacier.withOpacity(0.12),
+                          color: BrainDuelColors.glacier.withValues(alpha: 0.12),
                           borderRadius: const BorderRadius.all(BrainDuelRadii.sm),
                         ),
                         child: const Icon(Icons.bolt, size: 20, color: BrainDuelColors.glacier),
                       ),
                       const Spacer(),
-                      Chip(label: Text(challenge.badge as String)),
+                      Chip(label: Text(challenge.badge)),
                     ],
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    challenge.title as String,
+                    challenge.title,
                     style: Theme.of(context).textTheme.titleSmall,
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    challenge.subtitle as String,
+                    challenge.subtitle,
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                   const Spacer(),
                   Text(
-                    challenge.timeRemaining as String,
+                    challenge.timeRemaining,
                     style: Theme.of(context).textTheme.labelLarge,
                   ),
                   const SizedBox(height: 8),
@@ -290,8 +290,8 @@ class _SeasonalEventBanner extends StatelessWidget {
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              BrainDuelColors.glacier.withOpacity(0.16),
-              BrainDuelColors.neon.withOpacity(0.2),
+              BrainDuelColors.glacier.withValues(alpha: 0.16),
+              BrainDuelColors.neon.withValues(alpha: 0.2),
             ],
           ),
           borderRadius: const BorderRadius.all(BrainDuelRadii.md),
@@ -304,7 +304,7 @@ class _SeasonalEventBanner extends StatelessWidget {
               height: 44,
               width: 44,
               decoration: BoxDecoration(
-                color: BrainDuelColors.ember.withOpacity(0.2),
+                color: BrainDuelColors.ember.withValues(alpha: 0.2),
                 borderRadius: const BorderRadius.all(BrainDuelRadii.sm),
               ),
               child: const Icon(Icons.emoji_events, color: BrainDuelColors.ember),
@@ -315,12 +315,12 @@ class _SeasonalEventBanner extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    event.title as String,
+                    event.title,
                     style: Theme.of(context).textTheme.titleSmall,
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    event.description as String,
+                    event.description,
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                   const SizedBox(height: 12),
@@ -328,8 +328,8 @@ class _SeasonalEventBanner extends StatelessWidget {
                     spacing: 8,
                     runSpacing: 8,
                     children: [
-                      BDStatPill(label: 'Reward', value: event.rewardLabel as String),
-                      BDStatPill(label: 'Time', value: event.timeRemaining as String),
+                      BDStatPill(label: 'Reward', value: event.rewardLabel),
+                      BDStatPill(label: 'Time', value: event.timeRemaining),
                     ],
                   ),
                 ],
@@ -338,7 +338,7 @@ class _SeasonalEventBanner extends StatelessWidget {
             const SizedBox(width: 8),
             Icon(
               Icons.chevron_right,
-              color: BrainDuelColors.textMuted,
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
             ),
           ],
         ),
