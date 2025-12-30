@@ -46,6 +46,10 @@ class ChallengeIntroScreen extends ConsumerWidget {
           final timeText = MaterialLocalizations.of(context).formatTimeOfDay(
             TimeOfDay.fromDateTime(localExpiry),
           );
+          final isPublic = metadata.id.startsWith('public_');
+          final isExpired = isPublic && metadata.expiresAt.isBefore(DateTime.now().toUtc());
+          final notice = attemptState.notice;
+          final error = attemptState.error;
 
           return Padding(
             padding: const EdgeInsets.all(BrainDuelSpacing.sm),
@@ -108,15 +112,55 @@ class ChallengeIntroScreen extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
+                if (notice != null) ...[
+                  BDCard(
+                    padding: const EdgeInsets.all(12),
+                    child: Text(
+                      notice,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                if (error != null) ...[
+                  BDCard(
+                    padding: const EdgeInsets.all(12),
+                    child: Text(
+                      error,
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodySmall
+                          ?.copyWith(color: Colors.redAccent),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                if (isExpired) ...[
+                  BDCard(
+                    padding: const EdgeInsets.all(12),
+                    child: Text(
+                      'This public challenge has expired.',
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodySmall
+                          ?.copyWith(color: Colors.orangeAccent),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
                 Text(
                   'Expires $dateText at $timeText',
                   style: Theme.of(context).textTheme.labelLarge,
                 ),
                 const Spacer(),
                 BDPrimaryButton(
-                  label: attemptState.loading ? 'Starting...' : 'Start Challenge',
+                  label: attemptState.loading
+                      ? 'Starting...'
+                      : notice != null
+                          ? 'Resume Challenge'
+                          : 'Start Challenge',
                   isExpanded: true,
-                  onPressed: attemptState.loading
+                  onPressed: attemptState.loading || isExpired
                       ? null
                       : () async {
                           final attempt = await ref

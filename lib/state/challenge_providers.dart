@@ -21,6 +21,7 @@ final challengeMetadataProvider = FutureProvider.family<ChallengeMetadata, Strin
 class ChallengeAttemptState {
   final bool loading;
   final String? error;
+  final String? notice;
   final ChallengeAttempt? attempt;
   final bool submitting;
   final bool submitted;
@@ -34,6 +35,7 @@ class ChallengeAttemptState {
   const ChallengeAttemptState({
     required this.loading,
     required this.error,
+    required this.notice,
     required this.attempt,
     required this.submitting,
     required this.submitted,
@@ -48,6 +50,7 @@ class ChallengeAttemptState {
   factory ChallengeAttemptState.initial() => const ChallengeAttemptState(
     loading: false,
     error: null,
+    notice: null,
     attempt: null,
     submitting: false,
     submitted: false,
@@ -62,6 +65,7 @@ class ChallengeAttemptState {
   ChallengeAttemptState copyWith({
     bool? loading,
     String? error,
+    String? notice,
     ChallengeAttempt? attempt,
     bool? submitting,
     bool? submitted,
@@ -75,6 +79,7 @@ class ChallengeAttemptState {
     return ChallengeAttemptState(
       loading: loading ?? this.loading,
       error: error,
+      notice: notice,
       attempt: attempt ?? this.attempt,
       submitting: submitting ?? this.submitting,
       submitted: submitted ?? this.submitted,
@@ -109,16 +114,32 @@ class ChallengeAttemptNotifier extends StateNotifier<ChallengeAttemptState> {
   Future<ChallengeAttempt?> startAttempt(String challengeId) async {
     final existing = _startedAttempts[challengeId];
     if (existing != null) {
-      state = ChallengeAttemptState.initial().copyWith(attempt: existing);
+      state = ChallengeAttemptState.initial().copyWith(
+        attempt: existing,
+        notice: 'Attempt already started. Resume when you\'re ready.',
+      );
       return existing;
     }
 
-    state = state.copyWith(loading: true, error: null);
+    state = state.copyWith(loading: true, error: null, notice: null);
     try {
       final attempt = await ref.read(challengeServiceProvider).startAttempt(challengeId);
       _startedAttempts[challengeId] = attempt;
       state = ChallengeAttemptState.initial().copyWith(attempt: attempt, loading: false);
       return attempt;
+    } on ChallengeExpiredException catch (e) {
+      state = state.copyWith(
+        loading: false,
+        error: 'This challenge expired at ${e.expiresAt.toLocal()}.',
+      );
+      return null;
+    } on ChallengeRateLimitException catch (e) {
+      final seconds = e.retryAfter?.inSeconds ?? 0;
+      state = state.copyWith(
+        loading: false,
+        error: 'Too many attempts. Try again in ${seconds}s.',
+      );
+      return null;
     } catch (e) {
       state = state.copyWith(loading: false, error: e.toString());
       return null;
@@ -201,6 +222,13 @@ class ChallengeAttemptNotifier extends StateNotifier<ChallengeAttemptState> {
       );
       state = state.copyWith(submitting: false, submitted: true);
       return result;
+    } on ChallengeRateLimitException catch (e) {
+      final seconds = e.retryAfter?.inSeconds ?? 0;
+      state = state.copyWith(
+        submitting: false,
+        submissionError: 'You\'re answering too fast. Retry in ${seconds}s.',
+      );
+      return null;
     } catch (e) {
       state = state.copyWith(submitting: false, submissionError: e.toString());
       return null;
