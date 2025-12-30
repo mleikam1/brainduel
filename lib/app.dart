@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'models/challenge.dart';
 import 'screens/categories_screen.dart';
 import 'screens/category_detail_screen.dart';
 import 'screens/challenge_intro_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/profile_stats_screen.dart';
+import 'screens/question_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/topic_select_screen.dart';
 import 'screens/trivia_game_screen.dart';
@@ -114,10 +116,14 @@ class TriviaApp extends StatelessWidget {
             name: nameQuestionFlow,
             pageBuilder: (context, state) {
               final challengeId = state.pathParameters['challengeId']!;
+              final attempt = state.extra as ChallengeAttempt?;
+              if (attempt == null) {
+                return const MaterialPage(child: SizedBox.shrink());
+              }
               return MaterialPage(
                 key: state.pageKey,
                 arguments: challengeId,
-                child: const TriviaGameScreen(),
+                child: QuestionScreen(attempt: attempt),
               );
             },
           ),
