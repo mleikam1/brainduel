@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../app.dart';
 import '../state/categories_provider.dart';
 import '../theme/brain_duel_theme.dart';
@@ -21,7 +22,7 @@ class HomeScreen extends ConsumerWidget {
       subtitle: 'Competitive trivia arena',
       actions: [
         IconButton(
-          onPressed: () => Navigator.of(context).pushNamed(TriviaApp.routeProfile),
+          onPressed: () => context.pushNamed(TriviaApp.nameProfile),
           icon: const BDAvatar(name: 'Alex', radius: 18),
         ),
       ],
@@ -60,7 +61,7 @@ class HomeScreen extends ConsumerWidget {
                   label: 'Play Solo',
                   icon: Icons.play_arrow,
                   isExpanded: true,
-                  onPressed: () => Navigator.of(context).pushNamed(TriviaApp.routeCategories),
+                  onPressed: () => context.pushNamed(TriviaApp.nameCategories),
                 ),
               ),
               const SizedBox(width: 12),
@@ -91,9 +92,9 @@ class HomeScreen extends ConsumerWidget {
                     return SizedBox(
                       width: 180,
                       child: BDCard(
-                        onTap: () => Navigator.of(context).pushNamed(
-                          TriviaApp.routeCategoryDetail,
-                          arguments: category.id,
+                        onTap: () => context.pushNamed(
+                          TriviaApp.nameCategoryDetail,
+                          extra: category.id,
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -128,9 +129,9 @@ class HomeScreen extends ConsumerWidget {
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 12),
                     child: BDCard(
-                      onTap: () => Navigator.of(context).pushNamed(
-                        TriviaApp.routeCategoryDetail,
-                        arguments: category.id,
+                      onTap: () => context.pushNamed(
+                        TriviaApp.nameCategoryDetail,
+                        extra: category.id,
                       ),
                       child: Row(
                         children: [
@@ -167,7 +168,7 @@ class HomeScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 12),
           TextButton(
-            onPressed: () => Navigator.of(context).pushNamed(TriviaApp.routeSettings),
+            onPressed: () => context.pushNamed(TriviaApp.nameSettings),
             child: const Text('Settings'),
           ),
         ],

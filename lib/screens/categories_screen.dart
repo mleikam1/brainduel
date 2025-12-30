@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../app.dart';
 import '../state/categories_provider.dart';
 import '../theme/brain_duel_theme.dart';
@@ -58,9 +59,9 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
                         points: detail.points,
                         questionCount: detail.questionCount,
                         onTap: () {
-                          Navigator.of(context).pushNamed(
-                            TriviaApp.routeCategoryDetail,
-                            arguments: c.id,
+                          context.pushNamed(
+                            TriviaApp.nameCategoryDetail,
+                            extra: c.id,
                           );
                         },
                       );

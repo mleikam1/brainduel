@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../app.dart';
 import '../models/leaderboard_entry.dart';
 import '../theme/brain_duel_theme.dart';
@@ -111,17 +112,14 @@ class TriviaResultScreen extends StatelessWidget {
             BDSecondaryButton(
               label: 'Play Again',
               isExpanded: true,
-              onPressed: () => Navigator.of(context).pushReplacementNamed(
-                TriviaApp.routeGame,
-                arguments: categoryId,
+              onPressed: () => context.goNamed(
+                TriviaApp.nameGame,
+                extra: categoryId,
               ),
             ),
             const SizedBox(height: 8),
             TextButton(
-              onPressed: () => Navigator.of(context).pushNamedAndRemoveUntil(
-                TriviaApp.routeCategories,
-                    (route) => route.settings.name == TriviaApp.routeHome,
-              ),
+              onPressed: () => context.goNamed(TriviaApp.nameCategories),
               child: const Text('Back to Categories'),
             ),
           ],
