@@ -99,7 +99,24 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
       final decoded = json.decode(packText) as Map<String, dynamic>;
       final pack = TriviaPack.fromJson(decoded);
 
-      final session = builder.buildSession(pack: pack, sessionSize: 10);
+      if (pack.questions.length < kTriviaQuestionCount) {
+        analytics.logEvent(
+          'trivia_pack_insufficient_questions',
+          parameters: {
+            'categoryId': categoryId,
+            'available': pack.questions.length,
+            'required': kTriviaQuestionCount,
+          },
+        );
+        state = state.copyWith(
+          loading: false,
+          session: null,
+          error: 'More questions coming soon for this topic.',
+        );
+        return;
+      }
+
+      final session = builder.buildSession(pack: pack);
 
       analytics.logEvent('game_started', parameters: {'categoryId': categoryId});
 

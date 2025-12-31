@@ -2,10 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../app.dart';
-import '../models/home_challenge.dart';
-import '../models/seasonal_event.dart';
 import '../state/categories_provider.dart';
-import '../state/home_feed_provider.dart';
 import '../theme/brain_duel_theme.dart';
 import '../widgets/app_scaffold.dart';
 import '../widgets/bd_avatar.dart';
@@ -13,7 +10,6 @@ import '../widgets/bd_buttons.dart';
 import '../widgets/bd_card.dart';
 import '../widgets/bd_stat_pill.dart';
 import '../widgets/category_card.dart';
-import '../widgets/challenge_card.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -21,9 +17,7 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final categoriesAsync = ref.watch(categoriesProvider);
-    final homeFeedAsync = ref.watch(homeFeedProvider);
     final textScale = MediaQuery.textScaleFactorOf(context);
-    final carouselHeight = (220 + (textScale - 1) * 96).clamp(220, 320).toDouble();
     final exploreHeight = (220 + (textScale - 1) * 96).clamp(220, 320).toDouble();
 
     return BDAppScaffold(
@@ -96,58 +90,6 @@ class HomeScreen extends ConsumerWidget {
                     ),
                   ),
                 ],
-              ),
-            ),
-          ),
-          const SliverToBoxAdapter(child: SizedBox(height: 20)),
-          SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: BrainDuelSpacing.sm),
-            sliver: SliverToBoxAdapter(
-              child: homeFeedAsync.when(
-                data: (homeFeed) {
-                  final seasonalEvent = homeFeed.seasonalEvent;
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _SectionHeader(title: 'Daily Challenges'),
-                      const SizedBox(height: 12),
-                      _ChallengeCarousel(
-                        challenges: homeFeed.dailyChallenges,
-                        height: carouselHeight,
-                        onTap: (challengeId) => context.pushNamed(
-                          TriviaApp.nameChallengeIntro,
-                          pathParameters: {'challengeId': challengeId},
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      if (seasonalEvent != null) ...[
-                        _SeasonalEventBanner(
-                          event: seasonalEvent,
-                          onTap: () => context.pushNamed(TriviaApp.nameSeasonalEvent),
-                        ),
-                        const SizedBox(height: 20),
-                      ],
-                      _SectionHeader(title: 'Trending Public Challenges'),
-                      const SizedBox(height: 12),
-                      _ChallengeCarousel(
-                        challenges: homeFeed.trendingChallenges,
-                        height: carouselHeight,
-                        onTap: (challengeId) => context.pushNamed(
-                          TriviaApp.nameChallengeIntro,
-                          pathParameters: {'challengeId': challengeId},
-                        ),
-                      ),
-                    ],
-                  );
-                },
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (error, _) => Center(
-                  child: Text(
-                    'Failed to load: $error',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
               ),
             ),
           ),
@@ -260,121 +202,6 @@ class _SectionHeader extends StatelessWidget {
             ),
           ),
       ],
-    );
-  }
-}
-
-class _ChallengeCarousel extends StatelessWidget {
-  const _ChallengeCarousel({
-    required this.challenges,
-    required this.height,
-    required this.onTap,
-  });
-
-  final List<HomeChallenge> challenges;
-  final double height;
-  final void Function(String challengeId) onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: height,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: challenges.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 12),
-        itemBuilder: (context, index) {
-          final challenge = challenges[index];
-          return SizedBox(
-            width: 210,
-            child: ChallengeCard(
-              challenge: challenge,
-              onTap: () => onTap(challenge.id),
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _SeasonalEventBanner extends StatelessWidget {
-  const _SeasonalEventBanner({
-    required this.event,
-    this.onTap,
-  });
-
-  final SeasonalEvent event;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return BDCard(
-      padding: EdgeInsets.zero,
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              BrainDuelColors.glacier.withValues(alpha: 0.16),
-              BrainDuelColors.neon.withValues(alpha: 0.2),
-            ],
-          ),
-          borderRadius: const BorderRadius.all(BrainDuelRadii.md),
-        ),
-        padding: const EdgeInsets.all(18),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            DecoratedBox(
-              decoration: BoxDecoration(
-                color: BrainDuelColors.ember.withValues(alpha: 0.2),
-                borderRadius: const BorderRadius.all(BrainDuelRadii.sm),
-              ),
-              child: const Padding(
-                padding: EdgeInsets.all(10),
-                child: Icon(Icons.emoji_events, color: BrainDuelColors.ember),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    event.title,
-                    style: Theme.of(context).textTheme.titleSmall,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    event.description,
-                    style: Theme.of(context).textTheme.bodySmall,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      BDStatPill(label: 'Reward', value: event.rewardLabel),
-                      BDStatPill(label: 'Time', value: event.timeRemaining),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Icon(
-              Icons.chevron_right,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
