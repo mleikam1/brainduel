@@ -27,9 +27,9 @@ class TriviaResultScreen extends StatelessWidget {
     final categoryId = (args['categoryId'] as String?) ?? 'sports';
     final correct = (args['correct'] as int?) ?? 0;
     final total = (args['total'] as int?) ?? 0;
+    final points = (args['points'] as int?) ?? (correct * 100);
     final startedAt = DateTime.tryParse(args['startedAt'] as String? ?? '');
     final timeTaken = startedAt == null ? const Duration(seconds: 0) : DateTime.now().difference(startedAt);
-    final points = correct * 100;
 
     final participants = [
       LeaderboardEntry(name: 'You', points: points, time: timeTaken, rank: 2),
@@ -43,95 +43,102 @@ class TriviaResultScreen extends StatelessWidget {
       title: 'Scoreboard',
       child: Padding(
         padding: const EdgeInsets.all(BrainDuelSpacing.sm),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            ScoreSummary(correct: correct, total: total, points: points, timeTaken: timeTaken),
-            const SizedBox(height: 16),
-            Text('Top Rankings', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 12),
-            Row(
-              children: participants.take(3).map((entry) {
-                return Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: BDCard(
-                      padding: const EdgeInsets.all(12),
-                      child: Column(
-                        children: [
-                          BDAvatar(name: entry.name, radius: 18),
-                          const SizedBox(height: 8),
-                          Text(
-                            '#${entry.rank}',
-                            style: Theme.of(context).textTheme.titleMedium,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    ScoreSummary(correct: correct, total: total, points: points, timeTaken: timeTaken),
+                    const SizedBox(height: 16),
+                    Text('Top Rankings', style: Theme.of(context).textTheme.titleMedium),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: participants.take(3).map((entry) {
+                        final columns = constraints.maxWidth < 420 ? 2 : 3;
+                        final width = (constraints.maxWidth - (columns - 1) * 8) / columns;
+                        return SizedBox(
+                          width: width,
+                          child: BDCard(
+                            padding: const EdgeInsets.all(12),
+                            child: Column(
+                              children: [
+                                BDAvatar(name: entry.name, radius: 18),
+                                const SizedBox(height: 8),
+                                Text(
+                                  '#${entry.rank}',
+                                  style: Theme.of(context).textTheme.titleMedium,
+                                ),
+                                Text(entry.name, style: Theme.of(context).textTheme.bodySmall),
+                                const SizedBox(height: 4),
+                                Text('${entry.points} pts', style: Theme.of(context).textTheme.labelLarge),
+                              ],
+                            ),
                           ),
-                          Text(entry.name, style: Theme.of(context).textTheme.bodySmall),
-                          const SizedBox(height: 4),
-                          Text('${entry.points} pts', style: Theme.of(context).textTheme.labelLarge),
-                        ],
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 16),
+                    ...participants.map((entry) {
+                      final minutes = entry.time.inMinutes;
+                      final seconds = entry.time.inSeconds.remainder(60);
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: BDCard(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          child: Row(
+                            children: [
+                              Text('#${entry.rank}', style: Theme.of(context).textTheme.titleSmall),
+                              const SizedBox(width: 12),
+                              BDAvatar(name: entry.name, radius: 18),
+                              const SizedBox(width: 12),
+                              Expanded(child: Text(entry.name, style: Theme.of(context).textTheme.bodyLarge)),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text('${entry.points} pts', style: Theme.of(context).textTheme.bodyLarge),
+                                  Text('${minutes}m ${seconds}s', style: Theme.of(context).textTheme.bodySmall),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
+                    const SizedBox(height: 12),
+                    BDPrimaryButton(
+                      label: 'Share Results',
+                      icon: Icons.share,
+                      isExpanded: true,
+                      onPressed: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Share hook ready for integration.')),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 10),
+                    BDSecondaryButton(
+                      label: 'Play Again',
+                      isExpanded: true,
+                      onPressed: () => context.goNamed(
+                        TriviaApp.nameGame,
+                        extra: categoryId,
                       ),
                     ),
-                  ),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: ListView.separated(
-                itemCount: participants.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 10),
-                itemBuilder: (context, index) {
-                  final entry = participants[index];
-                  final minutes = entry.time.inMinutes;
-                  final seconds = entry.time.inSeconds.remainder(60);
-                  return BDCard(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    child: Row(
-                      children: [
-                        Text('#${entry.rank}', style: Theme.of(context).textTheme.titleSmall),
-                        const SizedBox(width: 12),
-                        BDAvatar(name: entry.name, radius: 18),
-                        const SizedBox(width: 12),
-                        Expanded(child: Text(entry.name, style: Theme.of(context).textTheme.bodyLarge)),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text('${entry.points} pts', style: Theme.of(context).textTheme.bodyLarge),
-                            Text('${minutes}m ${seconds}s', style: Theme.of(context).textTheme.bodySmall),
-                          ],
-                        ),
-                      ],
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: () => context.goNamed(TriviaApp.nameCategories),
+                      child: const Text('Back to Categories'),
                     ),
-                  );
-                },
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            BDPrimaryButton(
-              label: 'Share Results',
-              icon: Icons.share,
-              isExpanded: true,
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Share hook ready for integration.')),
-                );
-              },
-            ),
-            const SizedBox(height: 10),
-            BDSecondaryButton(
-              label: 'Play Again',
-              isExpanded: true,
-              onPressed: () => context.goNamed(
-                TriviaApp.nameGame,
-                extra: categoryId,
-              ),
-            ),
-            const SizedBox(height: 8),
-            TextButton(
-              onPressed: () => context.goNamed(TriviaApp.nameCategories),
-              child: const Text('Back to Categories'),
-            ),
-          ],
+            );
+          },
         ),
       ),
     );

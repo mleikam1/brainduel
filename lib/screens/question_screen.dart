@@ -49,17 +49,16 @@ class _QuestionScreenState extends ConsumerState<QuestionScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
               children: [
                 BDStatPill(
                   label: 'Qs',
                   value: '${state.currentIndex + 1}/${attempt.questions.length}',
                 ),
-                const SizedBox(width: 8),
                 BDStatPill(label: 'Mode', value: 'Challenge'),
-                const SizedBox(width: 8),
                 BDStatPill(label: phaseLabel, value: '${remainingSeconds}s'),
-                const Spacer(),
               ],
             ),
             const SizedBox(height: 16),

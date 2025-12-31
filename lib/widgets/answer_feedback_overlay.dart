@@ -6,14 +6,12 @@ class AnswerFeedbackOverlay extends StatelessWidget {
     required this.isCorrect,
     required this.explanation,
     required this.correctAnswer,
-    required this.onNext,
     this.isTimedOut = false,
   });
 
   final bool isCorrect;
   final String? explanation;
   final String correctAnswer;
-  final VoidCallback onNext;
   final bool isTimedOut;
 
   @override
@@ -44,8 +42,12 @@ class AnswerFeedbackOverlay extends StatelessWidget {
               const SizedBox(height: 8),
               Text(explanation!),
             ],
-            const SizedBox(height: 12),
-            FilledButton(onPressed: onNext, child: const Text('Continue')),
+            const SizedBox(height: 8),
+            Text(
+              'Next question…',
+              style: Theme.of(context).textTheme.bodySmall,
+              textAlign: TextAlign.center,
+            ),
           ],
         ),
       ),

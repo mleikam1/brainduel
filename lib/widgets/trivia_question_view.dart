@@ -11,18 +11,18 @@ class TriviaQuestionView extends StatelessWidget {
     required this.currentIndex,
     required this.selectedAnswerId,
     required this.isAnswered,
-    required this.onSelectAnswer,
-    required this.onNext,
     required this.isTimedOut,
+    required this.showAnswers,
+    required this.onSelectAnswer,
   });
 
   final TriviaSession session;
   final int currentIndex;
   final String? selectedAnswerId;
   final bool isAnswered;
-  final void Function(String answerId) onSelectAnswer;
-  final VoidCallback onNext;
   final bool isTimedOut;
+  final bool showAnswers;
+  final void Function(String answerId) onSelectAnswer;
 
   @override
   Widget build(BuildContext context) {
@@ -58,42 +58,52 @@ class TriviaQuestionView extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
-        ...q.answers.map((a) {
-          final isSelected = selectedAnswerId == a.id;
-          final isCorrect = a.id == correctAnswerId;
-          BDAnswerState state = BDAnswerState.idle;
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 250),
+          child: showAnswers
+              ? Column(
+                  key: const ValueKey('answers'),
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    ...q.answers.map((a) {
+                      final isSelected = selectedAnswerId == a.id;
+                      final isCorrect = a.id == correctAnswerId;
+                      BDAnswerState state = BDAnswerState.idle;
 
-          if (isAnswered || isTimedOut) {
-            if (isCorrect) {
-              state = BDAnswerState.correct;
-            } else if (isSelected && !isCorrect) {
-              state = BDAnswerState.incorrect;
-            } else {
-              state = BDAnswerState.disabled;
-            }
-          } else if (isSelected) {
-            state = BDAnswerState.selected;
-          }
+                      if (isAnswered || isTimedOut) {
+                        if (isCorrect) {
+                          state = BDAnswerState.correct;
+                        } else if (isSelected && !isCorrect) {
+                          state = BDAnswerState.incorrect;
+                        } else {
+                          state = BDAnswerState.disabled;
+                        }
+                      } else if (isSelected) {
+                        state = BDAnswerState.selected;
+                      }
 
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: BDAnswerOptionTile(
-              text: a.text,
-              state: state,
-              onTap: (isAnswered || isTimedOut) ? null : () => onSelectAnswer(a.id),
-            ),
-          );
-        }),
-        if (isAnswered || isTimedOut) ...[
-          const SizedBox(height: 8),
-          AnswerFeedbackOverlay(
-            isCorrect: selectedAnswerId == correctAnswerId,
-            explanation: q.explanation,
-            correctAnswer: q.answers.firstWhere((a) => a.correct).text,
-            isTimedOut: isTimedOut,
-            onNext: onNext,
-          ),
-        ],
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: BDAnswerOptionTile(
+                          text: a.text,
+                          state: state,
+                          onTap: (isAnswered || isTimedOut) ? null : () => onSelectAnswer(a.id),
+                        ),
+                      );
+                    }),
+                    if (isAnswered || isTimedOut) ...[
+                      const SizedBox(height: 8),
+                      AnswerFeedbackOverlay(
+                        isCorrect: selectedAnswerId == correctAnswerId,
+                        explanation: q.explanation,
+                        correctAnswer: q.answers.firstWhere((a) => a.correct).text,
+                        isTimedOut: isTimedOut,
+                      ),
+                    ],
+                  ],
+                )
+              : const SizedBox.shrink(key: ValueKey('hidden')),
+        ),
       ],
     );
   }
