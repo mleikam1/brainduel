@@ -23,17 +23,6 @@ class QuestionScreen extends ConsumerStatefulWidget {
 }
 
 class _QuestionScreenState extends ConsumerState<QuestionScreen> {
-  bool _loaded = false;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (!_loaded) {
-      ref.read(challengeAttemptProvider.notifier).loadAttempt(widget.attempt);
-      _loaded = true;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(challengeAttemptProvider);
