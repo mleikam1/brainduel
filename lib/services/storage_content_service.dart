@@ -115,9 +115,9 @@ class StorageContentService {
         },
       ]
     },
-    'challenge_daily_global_01': {
-      'id': 'daily_global_01',
-      'title': 'Daily Duel: World Wonders',
+    'challenge_featured_global_01': {
+      'id': 'featured_global_01',
+      'title': 'Featured Duel: World Wonders',
       'topic': 'World Wonders',
       'difficulty': 'Medium',
       'rules': [
@@ -160,8 +160,8 @@ class StorageContentService {
         },
       ],
     },
-    'challenge_daily_speed_02': {
-      'id': 'daily_speed_02',
+    'challenge_featured_speed_02': {
+      'id': 'featured_speed_02',
       'title': 'Quickfire Cosmos',
       'topic': 'Space & Stars',
       'difficulty': 'Hard',
@@ -205,8 +205,8 @@ class StorageContentService {
         },
       ],
     },
-    'challenge_public_tech_14': {
-      'id': 'public_tech_14',
+    'challenge_featured_tech_14': {
+      'id': 'featured_tech_14',
       'title': 'Tech Titans Throwdown',
       'topic': 'Technology',
       'difficulty': 'Medium',
@@ -250,8 +250,8 @@ class StorageContentService {
         },
       ],
     },
-    'challenge_public_sports_11': {
-      'id': 'public_sports_11',
+    'challenge_featured_sports_11': {
+      'id': 'featured_sports_11',
       'title': 'Championship Sprint',
       'topic': 'Sports',
       'difficulty': 'Medium',
@@ -295,8 +295,8 @@ class StorageContentService {
         },
       ],
     },
-    'challenge_public_pop_09': {
-      'id': 'public_pop_09',
+    'challenge_featured_pop_09': {
+      'id': 'featured_pop_09',
       'title': 'Pop Culture Pulse',
       'topic': 'Pop Culture',
       'difficulty': 'Easy',
