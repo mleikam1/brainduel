@@ -163,10 +163,10 @@ class ChallengeIntroScreen extends ConsumerWidget {
                   onPressed: attemptState.loading || isExpired
                       ? null
                       : () async {
-                          final attempt = await ref
-                              .read(challengeAttemptProvider.notifier)
-                              .startAttempt(challengeId);
+                          final notifier = ref.read(challengeAttemptProvider.notifier);
+                          final attempt = await notifier.startAttempt(challengeId);
                           if (attempt == null || !context.mounted) return;
+                          notifier.loadAttempt(attempt);
                           context.goNamed(
                             TriviaApp.nameQuestionFlow,
                             pathParameters: {'challengeId': challengeId},
