@@ -52,14 +52,14 @@ final categoryDetailProvider = Provider.family<CategoryDetail, Category>((ref, c
     'history': (
     subtitle: 'Historic milestones',
     description: 'From ancient empires to modern revolutions, prove your command of the past.',
-    questionCount: 18,
+    questionCount: 20,
     points: 1400,
     packCount: 3,
     ),
     'science': (
     subtitle: 'Future-forward facts',
     description: 'Challenge your grasp of physics, chemistry, and the universe beyond.',
-    questionCount: 16,
+    questionCount: 20,
     points: 1300,
     packCount: 2,
     ),
