@@ -1,22 +1,16 @@
 import 'package:flutter/material.dart';
 import '../models/category.dart';
 import '../theme/brain_duel_theme.dart';
-import 'bd_stat_pill.dart';
+import '../utils/category_icon_mapper.dart';
 
 class CategoryCard extends StatelessWidget {
   const CategoryCard({
     super.key,
     required this.category,
-    required this.subtitle,
-    required this.points,
-    required this.questionCount,
     required this.onTap,
   });
 
   final Category category;
-  final String subtitle;
-  final int points;
-  final int questionCount;
   final VoidCallback onTap;
 
   @override
@@ -32,7 +26,8 @@ class CategoryCard extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               DecoratedBox(
                 decoration: BoxDecoration(
@@ -40,37 +35,21 @@ class CategoryCard extends StatelessWidget {
                   borderRadius: const BorderRadius.all(BrainDuelRadii.sm),
                 ),
                 child: Padding(
-                  padding: const EdgeInsets.all(10),
-                  child: Text(
-                    category.icon,
-                    style: const TextStyle(fontSize: 22),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  padding: const EdgeInsets.all(12),
+                  child: Icon(
+                    CategoryIconMapper.forCategory(category),
+                    size: 28,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               Text(
                 category.title,
                 style: Theme.of(context).textTheme.titleSmall,
+                textAlign: TextAlign.center,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                subtitle,
-                style: Theme.of(context).textTheme.bodySmall,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  BDStatPill(label: 'Qs', value: '$questionCount'),
-                  BDStatPill(label: 'Pts', value: '$points'),
-                ],
               ),
             ],
           ),

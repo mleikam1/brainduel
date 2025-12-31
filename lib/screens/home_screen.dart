@@ -118,14 +118,10 @@ class HomeScreen extends ConsumerWidget {
                       separatorBuilder: (_, __) => const SizedBox(width: 12),
                       itemBuilder: (context, index) {
                         final category = categories[index];
-                        final detail = ref.read(categoryDetailProvider(category));
                         return SizedBox(
                           width: 210,
                           child: CategoryCard(
                             category: category,
-                            subtitle: detail.subtitle,
-                            points: detail.points,
-                            questionCount: detail.questionCount,
                             onTap: () => context.pushNamed(
                               TriviaApp.nameCategoryDetail,
                               extra: category.id,

@@ -58,12 +58,8 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {
                         final category = filtered[index];
-                        final detail = ref.read(categoryDetailProvider(category));
                         return CategoryCard(
                           category: category,
-                          subtitle: detail.subtitle,
-                          points: detail.points,
-                          questionCount: detail.questionCount,
                           onTap: () {
                             context.pushNamed(
                               TriviaApp.nameCategoryDetail,

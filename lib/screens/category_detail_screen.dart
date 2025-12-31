@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../app.dart';
 import '../state/categories_provider.dart';
 import '../theme/brain_duel_theme.dart';
+import '../utils/category_icon_mapper.dart';
 import '../widgets/app_scaffold.dart';
 import '../widgets/bd_avatar.dart';
 import '../widgets/bd_buttons.dart';
@@ -52,7 +53,11 @@ class CategoryDetailScreen extends ConsumerWidget {
                           ),
                         ),
                         child: Center(
-                          child: Text(category.icon, style: const TextStyle(fontSize: 48)),
+                          child: Icon(
+                            CategoryIconMapper.forCategory(category),
+                            size: 48,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
                         ),
                       ),
                     ),
