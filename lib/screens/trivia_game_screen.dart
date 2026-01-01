@@ -51,7 +51,8 @@ class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> with Ticker
       }
     });
     _sessionSubscription = ref.listenManual(triviaSessionProvider, (previous, next) {
-      if (next.session != null && previous?.currentIndex != next.currentIndex) {
+      if (next.session != null &&
+          (previous?.session == null || previous?.currentIndex != next.currentIndex)) {
         _startReadPhase();
       }
       if (next.isAnswered || next.isTimedOut) {
