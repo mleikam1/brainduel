@@ -14,6 +14,7 @@ import 'screens/seasonal_event_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/topic_select_screen.dart';
 import 'screens/trivia_game_screen.dart';
+import 'screens/post_quiz_ad_screen.dart';
 import 'screens/trivia_result_screen.dart';
 import 'theme/brain_duel_theme.dart';
 
@@ -28,6 +29,7 @@ class TriviaApp extends StatelessWidget {
   static const routeFriends = '/friends';
   static const routeGame = '/game';
   static const routeResults = '/results';
+  static const routePostQuizAd = '/post-quiz-ad';
   static const routeProfile = '/profile';
   static const routeSettings = '/settings';
   static const routeSeasonalEvent = '/events/seasonal';
@@ -40,6 +42,7 @@ class TriviaApp extends StatelessWidget {
   static const nameFriends = 'friends';
   static const nameGame = 'game';
   static const nameResults = 'results';
+  static const namePostQuizAd = 'postQuizAd';
   static const nameProfile = 'profile';
   static const nameSettings = 'settings';
   static const nameSeasonalEvent = 'seasonalEvent';
@@ -104,6 +107,15 @@ class TriviaApp extends StatelessWidget {
           key: state.pageKey,
           arguments: state.extra,
           child: const TriviaResultScreen(),
+        ),
+      ),
+      GoRoute(
+        path: routePostQuizAd,
+        name: namePostQuizAd,
+        pageBuilder: (context, state) => MaterialPage(
+          key: state.pageKey,
+          arguments: state.extra,
+          child: const PostQuizAdScreen(),
         ),
       ),
       GoRoute(

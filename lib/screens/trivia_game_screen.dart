@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../app.dart';
 import '../state/trivia_session_provider.dart';
 import '../state/user_stats_provider.dart';
+import '../state/subscription_provider.dart';
 import '../theme/brain_duel_theme.dart';
 import '../widgets/app_scaffold.dart';
 import '../widgets/bd_progress_bar.dart';
@@ -131,13 +132,14 @@ class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> with Ticker
     );
 
     context.goNamed(
-      TriviaApp.nameResults,
+      TriviaApp.namePostQuizAd,
       extra: {
         'categoryId': session.categoryId,
         'correct': correct,
         'total': total,
         'points': points,
         'startedAt': session.startedAt.toIso8601String(),
+        'isPaidUser': ref.read(isPaidUserProvider),
       },
     );
   }
