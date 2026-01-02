@@ -27,7 +27,8 @@ class TriviaQuestionView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final q = session.questions[currentIndex];
-    final correctAnswerId = q.answers.firstWhere((a) => a.correct).id;
+    final answers = q.displayAnswers;
+    final correctAnswerId = answers.firstWhere((a) => a.correct).id;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -65,7 +66,7 @@ class TriviaQuestionView extends StatelessWidget {
                   key: const ValueKey('answers'),
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    ...q.answers.map((a) {
+                    ...answers.map((a) {
                       final isSelected = selectedAnswerId == a.id;
                       final isCorrect = a.id == correctAnswerId;
                       BDAnswerState state = BDAnswerState.idle;
@@ -96,7 +97,7 @@ class TriviaQuestionView extends StatelessWidget {
                       AnswerFeedbackOverlay(
                         isCorrect: selectedAnswerId == correctAnswerId,
                         explanation: q.explanation,
-                        correctAnswer: q.answers.firstWhere((a) => a.correct).text,
+                        correctAnswer: answers.firstWhere((a) => a.correct).text,
                         isTimedOut: isTimedOut,
                       ),
                     ],
