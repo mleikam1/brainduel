@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../app.dart';
 import '../models/challenge.dart';
-import '../state/ad_provider.dart';
 import '../state/challenge_providers.dart';
 import '../state/subscription_provider.dart';
 import '../theme/brain_duel_theme.dart';
@@ -134,14 +133,12 @@ class _QuestionScreenState extends ConsumerState<QuestionScreen> {
                           }
                           return;
                         }
-                        final isPaid = ref.read(isPaidUserProvider);
-                        if (!isPaid) {
-                          await ref.read(adServiceProvider).showInterstitial(context);
-                        }
-                        if (!mounted) return;
                         context.goNamed(
-                          TriviaApp.nameResults,
-                          extra: {'challengeResult': result},
+                          TriviaApp.namePostQuizAd,
+                          extra: {
+                            'challengeResult': result,
+                            'isPaidUser': ref.read(isPaidUserProvider),
+                          },
                         );
                       } else {
                         ref.read(challengeAttemptProvider.notifier).nextQuestion();
