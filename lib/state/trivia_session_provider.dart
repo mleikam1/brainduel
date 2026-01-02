@@ -163,7 +163,7 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
     if (state.phase != TriviaQuestionPhase.answering) return;
 
     final q = session.questions[state.currentIndex];
-    final selected = q.answers.firstWhere((a) => a.id == answerId);
+    final selected = q.displayAnswers.firstWhere((a) => a.id == answerId);
     final correct = selected.correct;
     final startedAt = state.answerPhaseStartedAt ?? DateTime.now();
     final elapsedSeconds = DateTime.now().difference(startedAt).inSeconds;

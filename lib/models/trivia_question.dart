@@ -4,6 +4,7 @@ class TriviaQuestion {
   final String id;
   final String question;
   final List<TriviaAnswer> answers;
+  final List<TriviaAnswer>? sessionAnswers;
   final String? explanation;
   final String? mediaUrl;
 
@@ -11,9 +12,12 @@ class TriviaQuestion {
     required this.id,
     required this.question,
     required this.answers,
+    this.sessionAnswers,
     this.explanation,
     this.mediaUrl,
   });
+
+  List<TriviaAnswer> get displayAnswers => sessionAnswers ?? answers;
 
   factory TriviaQuestion.fromJson(Map<String, dynamic> json) {
     final answersJson = (json['answers'] as List).cast<Map<String, dynamic>>();
