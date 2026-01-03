@@ -33,6 +33,7 @@ class _QuestionScreenState extends ConsumerState<QuestionScreen> {
     final isReadPhase = state.phase == QuestionPhase.reading;
     final isAnswerPhase = state.phase == QuestionPhase.answering;
     final isLocked = state.phase == QuestionPhase.locked;
+    final hasAnsweredQuestion = state.phase == QuestionPhase.locked;
     final isSubmitting = state.submitting;
     final isSubmitted = state.submitted;
     final remainingSeconds = isReadPhase
@@ -88,10 +89,9 @@ class _QuestionScreenState extends ConsumerState<QuestionScreen> {
                     const SizedBox(height: 16),
                     ...question.choices.map((choice) {
                       final isSelected = selectedChoiceId == choice.id;
-                      final isDisabled = !isAnswerPhase;
-                      final stateValue = isSelected
-                          ? BDAnswerState.selected
-                          : isDisabled
+                      final stateValue = hasAnsweredQuestion
+                          ? (isSelected ? BDAnswerState.selected : BDAnswerState.disabled)
+                          : isReadPhase
                               ? BDAnswerState.disabled
                               : BDAnswerState.idle;
                       return Padding(

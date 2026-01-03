@@ -9,8 +9,7 @@ class TriviaQuestionView extends StatelessWidget {
     required this.session,
     required this.currentIndex,
     required this.selectedAnswerId,
-    required this.isAnswered,
-    required this.isTimedOut,
+    required this.hasAnsweredQuestion,
     required this.showAnswers,
     required this.onSelectAnswer,
   });
@@ -18,8 +17,7 @@ class TriviaQuestionView extends StatelessWidget {
   final TriviaSession session;
   final int currentIndex;
   final String? selectedAnswerId;
-  final bool isAnswered;
-  final bool isTimedOut;
+  final bool hasAnsweredQuestion;
   final bool showAnswers;
   final void Function(String answerId) onSelectAnswer;
 
@@ -68,10 +66,8 @@ class TriviaQuestionView extends StatelessWidget {
                       final isSelected = selectedAnswerId == a.id;
                       BDAnswerState state = BDAnswerState.idle;
 
-                      if (isAnswered || isTimedOut) {
+                      if (hasAnsweredQuestion) {
                         state = isSelected ? BDAnswerState.selected : BDAnswerState.disabled;
-                      } else if (isSelected) {
-                        state = BDAnswerState.selected;
                       }
 
                       return Padding(
@@ -79,7 +75,7 @@ class TriviaQuestionView extends StatelessWidget {
                         child: BDAnswerOptionTile(
                           text: a.text,
                           state: state,
-                          onTap: (isAnswered || isTimedOut) ? null : () => onSelectAnswer(a.id),
+                          onTap: hasAnsweredQuestion ? null : () => onSelectAnswer(a.id),
                         ),
                       );
                     }),
