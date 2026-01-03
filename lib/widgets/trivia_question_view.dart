@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import '../models/trivia_answer.dart';
 import '../models/trivia_session.dart';
+import '../state/trivia_session_provider.dart';
 import 'bd_answer_option_tile.dart';
 import 'bd_card.dart';
 
@@ -8,23 +10,24 @@ class TriviaQuestionView extends StatelessWidget {
     super.key,
     required this.session,
     required this.currentIndex,
-    required this.selectedAnswerId,
-    required this.hasAnsweredQuestion,
-    required this.showAnswers,
+    required this.phase,
+    required this.selectedAnswer,
     required this.onSelectAnswer,
   });
 
   final TriviaSession session;
   final int currentIndex;
-  final String? selectedAnswerId;
-  final bool hasAnsweredQuestion;
-  final bool showAnswers;
+  final QuestionPhase phase;
+  final TriviaAnswer? selectedAnswer;
   final void Function(String answerId) onSelectAnswer;
 
   @override
   Widget build(BuildContext context) {
     final q = session.questions[currentIndex];
     final answers = q.displayAnswers;
+    final showAnswers = phase != QuestionPhase.reading;
+    final isAnswering = phase == QuestionPhase.answering;
+    final isAnswered = phase == QuestionPhase.answered;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -63,11 +66,13 @@ class TriviaQuestionView extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     ...answers.map((a) {
-                      final isSelected = selectedAnswerId == a.id;
+                      final isSelected = selectedAnswer?.id == a.id;
                       BDAnswerState state = BDAnswerState.idle;
 
-                      if (hasAnsweredQuestion) {
-                        state = isSelected ? BDAnswerState.selected : BDAnswerState.disabled;
+                      if (isAnswered && isSelected) {
+                        state = selectedAnswer?.correct == true
+                            ? BDAnswerState.correct
+                            : BDAnswerState.incorrect;
                       }
 
                       return Padding(
@@ -75,7 +80,7 @@ class TriviaQuestionView extends StatelessWidget {
                         child: BDAnswerOptionTile(
                           text: a.text,
                           state: state,
-                          onTap: hasAnsweredQuestion ? null : () => onSelectAnswer(a.id),
+                          onTap: isAnswering ? () => onSelectAnswer(a.id) : null,
                         ),
                       );
                     }),

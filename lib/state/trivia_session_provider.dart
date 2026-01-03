@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/trivia_pack.dart';
+import '../models/trivia_answer.dart';
 import '../models/trivia_session.dart';
 import '../services/storage_content_service.dart';
 import '../services/content_cache_service.dart';
@@ -8,10 +9,10 @@ import '../services/trivia_session_builder.dart';
 import '../services/analytics_service.dart';
 import 'categories_provider.dart';
 
-enum TriviaQuestionPhase {
+enum QuestionPhase {
   reading,
   answering,
-  feedback,
+  answered,
 }
 
 class TriviaGameState {
@@ -21,10 +22,10 @@ class TriviaGameState {
   final int currentIndex;
   final int points;
   final int correctAnswers;
-  final String? selectedAnswerId;
+  final TriviaAnswer? selectedAnswer;
   final bool isAnswered;
   final bool isTimedOut;
-  final TriviaQuestionPhase phase;
+  final QuestionPhase phase;
   final DateTime? answerPhaseStartedAt;
 
   const TriviaGameState({
@@ -34,7 +35,7 @@ class TriviaGameState {
     required this.currentIndex,
     required this.points,
     required this.correctAnswers,
-    required this.selectedAnswerId,
+    required this.selectedAnswer,
     required this.isAnswered,
     required this.isTimedOut,
     required this.phase,
@@ -48,10 +49,10 @@ class TriviaGameState {
     currentIndex: 0,
     points: 0,
     correctAnswers: 0,
-    selectedAnswerId: null,
+    selectedAnswer: null,
     isAnswered: false,
     isTimedOut: false,
-    phase: TriviaQuestionPhase.reading,
+    phase: QuestionPhase.reading,
     answerPhaseStartedAt: null,
   );
 
@@ -62,10 +63,10 @@ class TriviaGameState {
     int? currentIndex,
     int? points,
     int? correctAnswers,
-    String? selectedAnswerId,
+    TriviaAnswer? selectedAnswer,
     bool? isAnswered,
     bool? isTimedOut,
-    TriviaQuestionPhase? phase,
+    QuestionPhase? phase,
     DateTime? answerPhaseStartedAt,
   }) {
     return TriviaGameState(
@@ -75,7 +76,7 @@ class TriviaGameState {
       currentIndex: currentIndex ?? this.currentIndex,
       points: points ?? this.points,
       correctAnswers: correctAnswers ?? this.correctAnswers,
-      selectedAnswerId: selectedAnswerId ?? this.selectedAnswerId,
+      selectedAnswer: selectedAnswer ?? this.selectedAnswer,
       isAnswered: isAnswered ?? this.isAnswered,
       isTimedOut: isTimedOut ?? this.isTimedOut,
       phase: phase ?? this.phase,
@@ -149,9 +150,9 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
 
   void startAnswerPhase() {
     if (state.session == null) return;
-    if (state.phase != TriviaQuestionPhase.reading) return;
+    if (state.phase != QuestionPhase.reading) return;
     state = state.copyWith(
-      phase: TriviaQuestionPhase.answering,
+      phase: QuestionPhase.answering,
       answerPhaseStartedAt: DateTime.now(),
     );
   }
@@ -160,7 +161,7 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
     final session = state.session;
     if (session == null) return;
     if (state.isAnswered) return;
-    if (state.phase != TriviaQuestionPhase.answering) return;
+    if (state.phase != QuestionPhase.answering) return;
 
     final q = session.questions[state.currentIndex];
     final selected = q.displayAnswers.firstWhere((a) => a.id == answerId);
@@ -172,10 +173,10 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
     final clampedPoints = earnedPoints.clamp(0, 100);
 
     state = state.copyWith(
-      selectedAnswerId: answerId,
+      selectedAnswer: selected,
       isAnswered: true,
       isTimedOut: false,
-      phase: TriviaQuestionPhase.feedback,
+      phase: QuestionPhase.answered,
       points: state.points + clampedPoints,
       correctAnswers: correct ? state.correctAnswers + 1 : state.correctAnswers,
     );
@@ -206,11 +207,11 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
 
     state = state.copyWith(
       currentIndex: state.currentIndex + 1,
-      selectedAnswerId: null,
+      selectedAnswer: null,
       isAnswered: false,
       isTimedOut: false,
       error: null,
-      phase: TriviaQuestionPhase.reading,
+      phase: QuestionPhase.reading,
       answerPhaseStartedAt: null,
     );
   }
@@ -220,10 +221,10 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
     if (state.isAnswered) return;
 
     state = state.copyWith(
-      selectedAnswerId: null,
+      selectedAnswer: null,
       isAnswered: true,
       isTimedOut: true,
-      phase: TriviaQuestionPhase.feedback,
+      phase: QuestionPhase.answered,
     );
   }
 

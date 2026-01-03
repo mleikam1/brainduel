@@ -24,7 +24,7 @@ class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> with Ticker
   Timer? _readTimer;
   Timer? _answerTimer;
   Timer? _advanceTimer;
-  static const int _readSeconds = 3;
+  static const int _readSeconds = 4;
   static const int _answerSeconds = 10;
   late final AnimationController _answerTimerController;
   bool _started = false;
@@ -56,7 +56,7 @@ class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> with Ticker
           (previous?.session == null || previous?.currentIndex != next.currentIndex)) {
         _startReadPhase();
       }
-      if (next.isAnswered || next.isTimedOut) {
+      if (next.phase == QuestionPhase.answered) {
         _stopAnswerPhase();
         _scheduleAdvance();
       }
@@ -107,7 +107,7 @@ class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> with Ticker
 
   void _scheduleAdvance() {
     _advanceTimer?.cancel();
-    _advanceTimer = Timer(const Duration(milliseconds: 700), () {
+    _advanceTimer = Timer(const Duration(seconds: 1), () {
       if (!mounted) return;
       final notifier = ref.read(triviaSessionProvider.notifier);
       if (notifier.isLastQuestion) {
@@ -148,8 +148,8 @@ class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> with Ticker
   Widget build(BuildContext context) {
     final state = ref.watch(triviaSessionProvider);
     final points = state.points;
-    final isAnswerPhase = state.phase == TriviaQuestionPhase.answering;
-    final isReadPhase = state.phase == TriviaQuestionPhase.reading;
+    final isAnswerPhase = state.phase == QuestionPhase.answering;
+    final isReadPhase = state.phase == QuestionPhase.reading;
 
     return BDAppScaffold(
       title: 'Solo Match',
@@ -216,9 +216,8 @@ class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> with Ticker
                       child: TriviaQuestionView(
                         session: state.session!,
                         currentIndex: state.currentIndex,
-                        selectedAnswerId: state.selectedAnswerId,
-                        hasAnsweredQuestion: state.phase == TriviaQuestionPhase.feedback,
-                        showAnswers: !isReadPhase,
+                        phase: state.phase,
+                        selectedAnswer: state.selectedAnswer,
                         onSelectAnswer: (id) => ref.read(triviaSessionProvider.notifier).selectAnswer(id),
                       ),
                     ),
