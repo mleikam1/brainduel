@@ -345,32 +345,29 @@ class RematchState {
   }
 }
 
-final rematchProvider = StateNotifierProvider<RematchNotifier, RematchState>((ref) {
-  return RematchNotifier(ref);
+final rematchProvider = StateNotifierProvider.family<RematchNotifier, RematchState, String>((ref, challengeId) {
+  return RematchNotifier(ref, challengeId);
 });
 
 class RematchNotifier extends StateNotifier<RematchState> {
-  RematchNotifier(this.ref) : super(RematchState.initial());
+  RematchNotifier(this.ref, this.challengeId)
+      : super(
+          RematchState.initial().copyWith(challengeId: challengeId),
+        );
 
   final Ref ref;
-  final Map<String, int> _rematchCounts = {};
-
-  void loadChallenge(String challengeId) {
-    if (state.challengeId == challengeId) return;
-    state = RematchState.initial().copyWith(challengeId: challengeId);
-  }
+  final String challengeId;
+  int _rematchCount = 0;
 
   Future<void> requestRematch() async {
-    final challengeId = state.challengeId;
-    if (challengeId == null) return;
+    final activeChallengeId = state.challengeId ?? challengeId;
     state = state.copyWith(status: RematchStatus.requesting, error: null);
-    final index = _rematchCounts[challengeId] ?? 0;
     try {
       final request = await ref.read(challengeServiceProvider).createRematchRequest(
-            originalChallengeId: challengeId,
-            rematchIndex: index,
+            originalChallengeId: activeChallengeId,
+            rematchIndex: _rematchCount,
           );
-      _rematchCounts[challengeId] = index + 1;
+      _rematchCount += 1;
       state = state.copyWith(
         status: RematchStatus.pending,
         request: request,
