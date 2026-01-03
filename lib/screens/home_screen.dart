@@ -9,7 +9,6 @@ import '../state/home_feed_provider.dart';
 import '../state/trivia_session_provider.dart';
 import '../theme/brain_duel_theme.dart';
 import '../widgets/app_scaffold.dart';
-import '../widgets/bd_avatar.dart';
 import '../widgets/bd_buttons.dart';
 import '../widgets/bd_card.dart';
 import '../widgets/bd_stat_pill.dart';
@@ -39,8 +38,8 @@ class HomeScreen extends ConsumerWidget {
       subtitle: 'Daily competitive grind',
       actions: [
         IconButton(
-          onPressed: () => onTabSelected(4),
-          icon: const BDAvatar(name: 'Alex', radius: 18),
+          onPressed: () => context.pushNamed(TriviaApp.nameSettings),
+          icon: const Icon(Icons.settings),
         ),
       ],
       bottomNavigationBar: BrainDuelBottomNav(

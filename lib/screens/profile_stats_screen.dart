@@ -31,12 +31,12 @@ class ProfileStatsScreen extends ConsumerWidget {
             padding: const EdgeInsets.all(18),
             child: Row(
               children: [
-                const BDAvatar(name: 'Alex Morgan', radius: 28),
+                const BDAvatar(name: 'Matt Leikam', radius: 28),
                 const SizedBox(width: 16),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Alex Morgan', style: Theme.of(context).textTheme.titleLarge),
+                    Text('Matt Leikam', style: Theme.of(context).textTheme.titleLarge),
                     const SizedBox(height: 4),
                     Text('Rank Tier: Gold II', style: Theme.of(context).textTheme.bodyMedium),
                   ],

@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-import '../app.dart';
 import '../state/profile_insights_provider.dart';
 import '../state/subscription_provider.dart';
 import '../theme/brain_duel_theme.dart';
@@ -203,18 +201,6 @@ class ProfileScreen extends ConsumerWidget {
                       child: Text(isPaidUser ? 'Active' : 'Upgrade'),
                     ),
                   ],
-                ),
-              ),
-              const SizedBox(height: 20),
-              Text('Settings', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 12),
-              BDCard(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('App Settings'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => context.pushNamed(TriviaApp.nameSettings),
                 ),
               ),
             ],
