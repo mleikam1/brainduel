@@ -68,7 +68,7 @@ class _PostQuizAdScreenState extends ConsumerState<PostQuizAdScreen>
                 child: AnimatedBuilder(
                   animation: _shimmerController,
                   child: Text(
-                    'Please view this ad while we collect your score and rank!',
+                    'Hang tight while we collect your score and rank!',
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                           fontWeight: FontWeight.w800,
