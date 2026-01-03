@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../models/trivia_session.dart';
-import 'answer_feedback_overlay.dart';
 import 'bd_answer_option_tile.dart';
 import 'bd_card.dart';
 
@@ -28,7 +27,6 @@ class TriviaQuestionView extends StatelessWidget {
   Widget build(BuildContext context) {
     final q = session.questions[currentIndex];
     final answers = q.displayAnswers;
-    final correctAnswerId = answers.firstWhere((a) => a.correct).id;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -68,17 +66,10 @@ class TriviaQuestionView extends StatelessWidget {
                   children: [
                     ...answers.map((a) {
                       final isSelected = selectedAnswerId == a.id;
-                      final isCorrect = a.id == correctAnswerId;
                       BDAnswerState state = BDAnswerState.idle;
 
                       if (isAnswered || isTimedOut) {
-                        if (isCorrect) {
-                          state = BDAnswerState.correct;
-                        } else if (isSelected && !isCorrect) {
-                          state = BDAnswerState.incorrect;
-                        } else {
-                          state = BDAnswerState.disabled;
-                        }
+                        state = isSelected ? BDAnswerState.selected : BDAnswerState.disabled;
                       } else if (isSelected) {
                         state = BDAnswerState.selected;
                       }
@@ -92,15 +83,6 @@ class TriviaQuestionView extends StatelessWidget {
                         ),
                       );
                     }),
-                    if (isAnswered || isTimedOut) ...[
-                      const SizedBox(height: 8),
-                      AnswerFeedbackOverlay(
-                        isCorrect: selectedAnswerId == correctAnswerId,
-                        explanation: q.explanation,
-                        correctAnswer: answers.firstWhere((a) => a.correct).text,
-                        isTimedOut: isTimedOut,
-                      ),
-                    ],
                   ],
                 )
               : const SizedBox.shrink(key: ValueKey('hidden')),
