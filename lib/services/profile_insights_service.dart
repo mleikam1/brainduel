@@ -13,7 +13,7 @@ class ProfileInsightsService {
     final weakest = sorted.reversed.take(2).toList();
 
     return ProfileInsights(
-      displayName: 'Alex Morgan',
+      displayName: 'Matt Leikam',
       rankTier: 'Gold II',
       // Assumption: current streak is derived from the best streak in local stats until streak history is persisted.
       currentStreak: stats.bestStreak == 0 ? 0 : (stats.bestStreak - 1).clamp(0, stats.bestStreak),
