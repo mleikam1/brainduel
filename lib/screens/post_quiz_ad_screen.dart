@@ -11,9 +11,20 @@ class PostQuizAdScreen extends ConsumerStatefulWidget {
   ConsumerState<PostQuizAdScreen> createState() => _PostQuizAdScreenState();
 }
 
-class _PostQuizAdScreenState extends ConsumerState<PostQuizAdScreen> {
+class _PostQuizAdScreenState extends ConsumerState<PostQuizAdScreen>
+    with SingleTickerProviderStateMixin {
   Map<String, dynamic> _args = const {};
   bool _started = false;
+  late final AnimationController _shimmerController;
+
+  @override
+  void initState() {
+    super.initState();
+    _shimmerController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 3),
+    )..repeat();
+  }
 
   @override
   void didChangeDependencies() {
@@ -39,18 +50,51 @@ class _PostQuizAdScreenState extends ConsumerState<PostQuizAdScreen> {
   }
 
   @override
+  void dispose() {
+    _shimmerController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return PopScope(
       canPop: false,
       child: Scaffold(
-        appBar: AppBar(
-          automaticallyImplyLeading: false,
-          title: const Text('Adding up your score & rankings'),
-        ),
         body: SafeArea(
           child: SizedBox.expand(
-            child: Container(
+            child: ColoredBox(
               color: Theme.of(context).colorScheme.surface,
+              child: Center(
+                child: AnimatedBuilder(
+                  animation: _shimmerController,
+                  child: Text(
+                    'Please view this ad while we collect your score and rank!',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 28,
+                        ),
+                  ),
+                  builder: (context, child) {
+                    final colors = Theme.of(context).colorScheme;
+                    final base = colors.onSurface.withOpacity(0.6);
+                    final highlight = colors.onSurface.withOpacity(0.95);
+                    final shimmerValue = _shimmerController.value;
+                    return ShaderMask(
+                      blendMode: BlendMode.srcIn,
+                      shaderCallback: (rect) {
+                        return LinearGradient(
+                          colors: [base, highlight, base],
+                          stops: const [0.2, 0.5, 0.8],
+                          begin: Alignment(-1.2 + shimmerValue * 2.4, 0),
+                          end: Alignment(1.2 + shimmerValue * 2.4, 0),
+                        ).createShader(rect);
+                      },
+                      child: child,
+                    );
+                  },
+                ),
+              ),
             ),
           ),
         ),
