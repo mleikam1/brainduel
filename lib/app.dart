@@ -6,9 +6,8 @@ import 'screens/category_detail_screen.dart';
 import 'screens/challenge_intro_screen.dart';
 import 'screens/follow_link_screen.dart';
 import 'screens/friends_screen.dart';
-import 'screens/home_screen.dart';
+import 'screens/bottom_nav_shell.dart';
 import 'screens/onboarding_screen.dart';
-import 'screens/profile_stats_screen.dart';
 import 'screens/question_screen.dart';
 import 'screens/seasonal_event_screen.dart';
 import 'screens/settings_screen.dart';
@@ -65,7 +64,7 @@ class TriviaApp extends StatelessWidget {
       GoRoute(
         path: routeHome,
         name: nameHome,
-        builder: (context, state) => const HomeScreen(),
+        builder: (context, state) => const BottomNavShell(),
       ),
       GoRoute(
         path: routeTopicSelect,
@@ -121,7 +120,7 @@ class TriviaApp extends StatelessWidget {
       GoRoute(
         path: routeProfile,
         name: nameProfile,
-        builder: (context, state) => const ProfileStatsScreen(),
+        builder: (context, state) => const BottomNavShell(initialIndex: 4),
       ),
       GoRoute(
         path: routeSettings,

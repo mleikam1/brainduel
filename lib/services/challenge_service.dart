@@ -27,6 +27,10 @@ class ChallengeService {
     return definition.metadata;
   }
 
+  Future<ChallengeDefinition> fetchDefinition(String challengeId) async {
+    return _fetchDefinition(challengeId);
+  }
+
   Future<ChallengeAttempt> startAttempt(String challengeId) async {
     _enforceRateLimit(
       timestamps: _attemptStartTimestamps,
