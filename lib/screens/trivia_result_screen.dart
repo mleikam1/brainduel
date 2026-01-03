@@ -165,7 +165,6 @@ class _ChallengeResultViewState extends ConsumerState<ChallengeResultView> with 
   @override
   void initState() {
     super.initState();
-    ref.read(rematchProvider.notifier).loadChallenge(widget.result.challengeId);
     _pointsController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 900),
@@ -204,7 +203,7 @@ class _ChallengeResultViewState extends ConsumerState<ChallengeResultView> with 
     final seconds = widget.result.completionTime.inSeconds.remainder(60);
     final rankDelta = widget.result.rankDelta;
     final metadataAsync = ref.watch(challengeMetadataProvider(widget.result.challengeId));
-    final rematchState = ref.watch(rematchProvider);
+    final rematchState = ref.watch(rematchProvider(widget.result.challengeId));
 
     return BDAppScaffold(
       title: 'Results',
@@ -316,7 +315,10 @@ class _ChallengeResultViewState extends ConsumerState<ChallengeResultView> with 
               ),
             ),
             const SizedBox(height: 10),
-            _RematchPanel(state: rematchState),
+            _RematchPanel(
+              state: rematchState,
+              challengeId: widget.result.challengeId,
+            ),
             const SizedBox(height: 10),
             BDSecondaryButton(
               label: 'Back to Home',
@@ -342,13 +344,14 @@ IconData _deltaIcon(int delta) {
 }
 
 class _RematchPanel extends ConsumerWidget {
-  const _RematchPanel({required this.state});
+  const _RematchPanel({required this.state, required this.challengeId});
 
   final RematchState state;
+  final String challengeId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final notifier = ref.read(rematchProvider.notifier);
+    final notifier = ref.read(rematchProvider(challengeId).notifier);
     final request = state.request;
     final challengerAccepted = request?.challengerAccepted ?? false;
     final opponentAccepted = request?.opponentAccepted ?? false;
