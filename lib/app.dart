@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'auth/guest_auth_page.dart';
+import 'auth/startup_gate.dart';
 import 'models/challenge.dart';
 import 'screens/categories_screen.dart';
 import 'screens/category_detail_screen.dart';
@@ -53,16 +53,16 @@ class TriviaApp extends StatelessWidget {
   static const nameFollowLink = 'followLink';
 
   static final GoRouter _router = GoRouter(
-    initialLocation: routeGuestAuth,
+    initialLocation: '/',
     routes: [
       GoRoute(
         path: '/',
-        redirect: (_, __) => routeGuestAuth,
+        builder: (context, state) => const StartupGate(),
       ),
       GoRoute(
         path: routeGuestAuth,
         name: nameGuestAuth,
-        builder: (context, state) => const GuestAuthPage(),
+        builder: (context, state) => const StartupGate(),
       ),
       GoRoute(
         path: routeOnboarding,
