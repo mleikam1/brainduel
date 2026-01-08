@@ -99,7 +99,15 @@ class _TopicSelectionContent extends ConsumerWidget {
         BDPrimaryButton(
           label: 'Continue',
           isExpanded: true,
-          onPressed: canContinue ? () => context.goNamed(TriviaApp.nameHome) : null,
+          onPressed: canContinue
+              ? () async {
+                  final success =
+                      await ref.read(topicSelectionProvider.notifier).completeSelection();
+                  if (success && context.mounted) {
+                    context.goNamed(TriviaApp.nameHome);
+                  }
+                }
+              : null,
         ),
       ],
     );

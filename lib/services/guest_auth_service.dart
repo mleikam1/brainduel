@@ -15,6 +15,13 @@ class GuestAuthService {
 
   User? get currentUser => _auth.currentUser;
 
+  Stream<User?> get authStateChanges => _auth.authStateChanges();
+
+  Future<void> bootstrapUser(User user) async {
+    await ensureUserDocument(user);
+    await updateLastActive(user.uid);
+  }
+
   Future<User> signInAnonymously() async {
     final credential = await _auth.signInAnonymously();
     final user = credential.user;
@@ -38,6 +45,7 @@ class GuestAuthService {
         'lastActiveAt': FieldValue.serverTimestamp(),
         'tier': 'rookie',
         'totalXp': 0,
+        'topicsSelected': false,
       });
       debugPrint('[auth] created user document for ${user.uid}');
     }

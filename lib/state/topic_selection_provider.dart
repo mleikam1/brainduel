@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/topic_selection_service.dart';
+import '../services/user_profile_service.dart';
 import 'auth_provider.dart';
 
 final topicSelectionProvider = AsyncNotifierProvider<TopicSelectionController, Set<String>>(
@@ -10,10 +11,12 @@ final topicSelectionProvider = AsyncNotifierProvider<TopicSelectionController, S
 
 class TopicSelectionController extends AsyncNotifier<Set<String>> {
   late final TopicSelectionService _service;
+  late final UserProfileService _profileService;
 
   @override
   Future<Set<String>> build() async {
     _service = ref.read(topicSelectionServiceProvider);
+    _profileService = ref.read(userProfileServiceProvider);
 
     ref.listen<String?>(authUserIdProvider, (previous, next) {
       if (next == null || next == previous) return;
@@ -53,5 +56,14 @@ class TopicSelectionController extends AsyncNotifier<Set<String>> {
     final pending = await _service.hasPendingSync();
     if (!pending && selected.isEmpty) return;
     await _service.syncSelectedTopics(userId: userId, selectedIds: selected);
+  }
+
+  Future<bool> completeSelection() async {
+    final userId = ref.read(authUserIdProvider);
+    if (userId == null) {
+      return false;
+    }
+    await _profileService.markTopicsSelected(userId);
+    return true;
   }
 }

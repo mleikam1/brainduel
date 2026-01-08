@@ -34,8 +34,7 @@ class GuestAuthController extends StateNotifier<GuestAuthState> {
     if (user == null) {
       return false;
     }
-    await _authService.ensureUserDocument(user);
-    await _authService.updateLastActive(user.uid);
+    await _authService.bootstrapUser(user);
     _ref.read(authUserIdProvider.notifier).state = user.uid;
     return true;
   }
