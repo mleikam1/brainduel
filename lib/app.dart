@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'auth/guest_auth_page.dart';
 import 'models/challenge.dart';
 import 'screens/categories_screen.dart';
 import 'screens/category_detail_screen.dart';
@@ -20,6 +21,7 @@ import 'theme/brain_duel_theme.dart';
 class TriviaApp extends StatelessWidget {
   const TriviaApp({super.key});
 
+  static const routeGuestAuth = '/auth';
   static const routeOnboarding = '/onboarding';
   static const routeHome = '/home';
   static const routeCategories = '/categories';
@@ -34,6 +36,7 @@ class TriviaApp extends StatelessWidget {
   static const routeSeasonalEvent = '/events/seasonal';
 
   static const nameOnboarding = 'onboarding';
+  static const nameGuestAuth = 'guestAuth';
   static const nameHome = 'home';
   static const nameCategories = 'categories';
   static const nameCategoryDetail = 'categoryDetail';
@@ -50,11 +53,16 @@ class TriviaApp extends StatelessWidget {
   static const nameFollowLink = 'followLink';
 
   static final GoRouter _router = GoRouter(
-    initialLocation: routeOnboarding,
+    initialLocation: routeGuestAuth,
     routes: [
       GoRoute(
         path: '/',
-        redirect: (_, __) => routeOnboarding,
+        redirect: (_, __) => routeGuestAuth,
+      ),
+      GoRoute(
+        path: routeGuestAuth,
+        name: nameGuestAuth,
+        builder: (context, state) => const GuestAuthPage(),
       ),
       GoRoute(
         path: routeOnboarding,
