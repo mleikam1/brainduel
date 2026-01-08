@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,57 +18,98 @@ class StartupGate extends ConsumerStatefulWidget {
 }
 
 class _StartupGateState extends ConsumerState<StartupGate> {
+  StreamSubscription<User?>? _authSubscription;
+  User? _currentUser;
   String? _bootstrappedUid;
   Future<void>? _bootstrapFuture;
+  Object? _bootstrapError;
 
-  Future<void> _ensureBootstrap(User user) {
-    if (_bootstrappedUid != user.uid) {
+  @override
+  void initState() {
+    super.initState();
+    final authService = ref.read(guestAuthServiceProvider);
+    _authSubscription = authService.authStateChanges.listen(_handleAuthChange);
+  }
+
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
+  }
+
+  void _handleAuthChange(User? user) {
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _currentUser = user;
+      if (user == null) {
+        _bootstrappedUid = null;
+        _bootstrapFuture = null;
+        _bootstrapError = null;
+      }
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      if (user == null) {
+        ref.read(authUserIdProvider.notifier).state = null;
+        return;
+      }
+      if (_bootstrappedUid == user.uid) {
+        return;
+      }
       _bootstrappedUid = user.uid;
+      _bootstrapError = null;
       _bootstrapFuture = ref.read(guestAuthServiceProvider).bootstrapUser(user);
       ref.read(authUserIdProvider.notifier).state = user.uid;
-    }
-    return _bootstrapFuture!;
+      _bootstrapFuture!.catchError((error) {
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _bootstrapError = error;
+        });
+      });
+      setState(() {});
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final authService = ref.watch(guestAuthServiceProvider);
-    return StreamBuilder<User?>(
-      stream: authService.authStateChanges,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+    final user = _currentUser;
+    if (user == null) {
+      return const GuestEntryPage();
+    }
+    if (_bootstrapError != null) {
+      return const _StartupError();
+    }
+    final bootstrapFuture = _bootstrapFuture;
+    if (bootstrapFuture == null) {
+      return const _StartupLoading();
+    }
+    return FutureBuilder<void>(
+      future: bootstrapFuture,
+      builder: (context, bootstrapSnapshot) {
+        if (bootstrapSnapshot.connectionState == ConnectionState.waiting) {
           return const _StartupLoading();
         }
-        final user = snapshot.data;
-        if (user == null) {
-          _bootstrappedUid = null;
-          _bootstrapFuture = null;
-          ref.read(authUserIdProvider.notifier).state = null;
-          return const GuestEntryPage();
+        if (bootstrapSnapshot.hasError) {
+          return const _StartupError();
         }
-        return FutureBuilder<void>(
-          future: _ensureBootstrap(user),
-          builder: (context, bootstrapSnapshot) {
-            if (bootstrapSnapshot.connectionState == ConnectionState.waiting) {
+        final profileService = ref.watch(userProfileServiceProvider);
+        return StreamBuilder<bool?>(
+          stream: profileService.watchTopicsSelected(user.uid),
+          builder: (context, topicsSnapshot) {
+            if (topicsSnapshot.connectionState == ConnectionState.waiting) {
               return const _StartupLoading();
             }
-            if (bootstrapSnapshot.hasError) {
-              return const _StartupError();
+            final topicsSelected = topicsSnapshot.data ?? false;
+            if (!topicsSelected) {
+              return const TopicSelectScreen();
             }
-            final profileService = ref.watch(userProfileServiceProvider);
-            return StreamBuilder<bool?>(
-              stream: profileService.watchTopicsSelected(user.uid),
-              builder: (context, topicsSnapshot) {
-                if (topicsSnapshot.connectionState == ConnectionState.waiting) {
-                  return const _StartupLoading();
-                }
-                final topicsSelected = topicsSnapshot.data ?? false;
-                if (!topicsSelected) {
-                  return const TopicSelectScreen();
-                }
-                return const BottomNavShell();
-              },
-            );
+            return const BottomNavShell();
           },
         );
       },
