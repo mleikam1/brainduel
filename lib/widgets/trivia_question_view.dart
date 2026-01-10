@@ -10,15 +10,15 @@ class TriviaQuestionView extends StatelessWidget {
     required this.session,
     required this.currentIndex,
     required this.phase,
-    required this.selectedChoiceId,
+    required this.selectedIndex,
     required this.onSelectAnswer,
   });
 
   final GameSession session;
   final int currentIndex;
   final QuestionPhase phase;
-  final String? selectedChoiceId;
-  final void Function(String answerId) onSelectAnswer;
+  final int? selectedIndex;
+  final void Function(int answerIndex) onSelectAnswer;
 
   @override
   Widget build(BuildContext context) {
@@ -64,8 +64,10 @@ class TriviaQuestionView extends StatelessWidget {
                   key: const ValueKey('answers'),
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    ...answers.map((choice) {
-                      final isSelected = selectedChoiceId == choice;
+                    ...answers.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final choice = entry.value;
+                      final isSelected = selectedIndex == index;
                       final state = isAnswered && isSelected
                           ? BDAnswerState.selected
                           : isAnswering
@@ -77,7 +79,7 @@ class TriviaQuestionView extends StatelessWidget {
                         child: BDAnswerOptionTile(
                           text: choice,
                           state: state,
-                          onTap: isAnswering ? () => onSelectAnswer(choice) : null,
+                          onTap: isAnswering ? () => onSelectAnswer(index) : null,
                         ),
                       );
                     }),

@@ -17,9 +17,11 @@ class TriviaGameState {
   final int currentIndex;
   final int points;
   final int correctAnswers;
-  final String? selectedChoiceId;
+  final int? selectedIndex;
   final bool isAnswered;
   final bool isTimedOut;
+  final bool isSubmitting;
+  final bool hasAnsweredAny;
   final QuestionPhase phase;
   final DateTime? answerPhaseStartedAt;
   final DateTime? startedAt;
@@ -31,9 +33,11 @@ class TriviaGameState {
     required this.currentIndex,
     required this.points,
     required this.correctAnswers,
-    required this.selectedChoiceId,
+    required this.selectedIndex,
     required this.isAnswered,
     required this.isTimedOut,
+    required this.isSubmitting,
+    required this.hasAnsweredAny,
     required this.phase,
     required this.answerPhaseStartedAt,
     required this.startedAt,
@@ -46,9 +50,11 @@ class TriviaGameState {
     currentIndex: 0,
     points: 0,
     correctAnswers: 0,
-    selectedChoiceId: null,
+    selectedIndex: null,
     isAnswered: false,
     isTimedOut: false,
+    isSubmitting: false,
+    hasAnsweredAny: false,
     phase: QuestionPhase.reading,
     answerPhaseStartedAt: null,
     startedAt: null,
@@ -61,9 +67,11 @@ class TriviaGameState {
     int? currentIndex,
     int? points,
     int? correctAnswers,
-    String? selectedChoiceId,
+    int? selectedIndex,
     bool? isAnswered,
     bool? isTimedOut,
+    bool? isSubmitting,
+    bool? hasAnsweredAny,
     QuestionPhase? phase,
     DateTime? answerPhaseStartedAt,
     DateTime? startedAt,
@@ -75,9 +83,11 @@ class TriviaGameState {
       currentIndex: currentIndex ?? this.currentIndex,
       points: points ?? this.points,
       correctAnswers: correctAnswers ?? this.correctAnswers,
-      selectedChoiceId: selectedChoiceId ?? this.selectedChoiceId,
+      selectedIndex: selectedIndex ?? this.selectedIndex,
       isAnswered: isAnswered ?? this.isAnswered,
       isTimedOut: isTimedOut ?? this.isTimedOut,
+      isSubmitting: isSubmitting ?? this.isSubmitting,
+      hasAnsweredAny: hasAnsweredAny ?? this.hasAnsweredAny,
       phase: phase ?? this.phase,
       answerPhaseStartedAt: answerPhaseStartedAt ?? this.answerPhaseStartedAt,
       startedAt: startedAt ?? this.startedAt,
@@ -98,7 +108,7 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
   TriviaSessionNotifier(this.ref) : super(TriviaGameState.initial());
 
   final Ref ref;
-  final Map<String, GameAnswer> _answerByQuestionId = {};
+  final Map<String, int> _selectedIndexByQuestionId = {};
   final Set<String> _completedGameIds = {};
 
   Future<void> startGame(String categoryId) async {
@@ -119,7 +129,7 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
 
       analytics.logEvent('game_started', parameters: {'topicId': categoryId});
 
-      _answerByQuestionId.clear();
+      _selectedIndexByQuestionId.clear();
       state = TriviaGameState.initial().copyWith(
         session: session,
         loading: false,
@@ -133,25 +143,31 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
   void startAnswerPhase() {
     if (state.session == null) return;
     if (state.phase != QuestionPhase.reading) return;
+    if (state.isSubmitting) return;
     state = state.copyWith(
       phase: QuestionPhase.answering,
       answerPhaseStartedAt: DateTime.now(),
     );
   }
 
-  void selectAnswer(String answerId) {
+  void selectAnswer(int answerIndex) {
     final session = state.session;
     if (session == null) return;
     if (state.isAnswered) return;
     if (state.phase != QuestionPhase.answering) return;
+    if (state.isSubmitting) return;
 
     final q = session.questionsSnapshot[state.currentIndex];
-    _answerByQuestionId[q.id] = GameAnswer(questionId: q.id, choice: answerId);
+    if (_selectedIndexByQuestionId.containsKey(q.id)) return;
+    if (answerIndex < 0 || answerIndex >= q.choices.length) return;
+    _selectedIndexByQuestionId[q.id] = answerIndex;
+    final answerId = q.choices[answerIndex];
 
     state = state.copyWith(
-      selectedChoiceId: answerId,
+      selectedIndex: answerIndex,
       isAnswered: true,
       isTimedOut: false,
+      hasAnsweredAny: true,
       phase: QuestionPhase.answered,
     );
 
@@ -175,10 +191,11 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
     if (session == null) return;
 
     if (isLastQuestion) return;
+    if (state.isSubmitting) return;
 
     state = state.copyWith(
       currentIndex: state.currentIndex + 1,
-      selectedChoiceId: null,
+      selectedIndex: null,
       isAnswered: false,
       isTimedOut: false,
       error: null,
@@ -190,11 +207,18 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
   void timeoutQuestion() {
     if (state.session == null) return;
     if (state.isAnswered) return;
+    if (state.isSubmitting) return;
+
+    final q = state.session!.questionsSnapshot[state.currentIndex];
+    final fallbackIndex = _selectedIndexByQuestionId[q.id] ?? 0;
+    final boundedIndex = fallbackIndex.clamp(0, q.choices.length - 1);
+    _selectedIndexByQuestionId[q.id] = boundedIndex;
 
     state = state.copyWith(
-      selectedChoiceId: null,
+      selectedIndex: boundedIndex,
       isAnswered: true,
       isTimedOut: true,
+      hasAnsweredAny: true,
       phase: QuestionPhase.answered,
     );
   }
@@ -207,10 +231,15 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
       return null;
     }
     try {
-      final answers = session.questionsSnapshot
-          .map((question) => _answerByQuestionId[question.id])
-          .whereType<GameAnswer>()
-          .toList();
+      state = state.copyWith(isSubmitting: true, error: null);
+      final answers = session.questionsSnapshot.map((question) {
+        final index = _selectedIndexByQuestionId[question.id] ?? 0;
+        final boundedIndex = index.clamp(0, question.choices.length - 1);
+        return GameAnswer(
+          questionId: question.id,
+          choice: question.choices[boundedIndex],
+        );
+      }).toList();
       final result = await ref.read(gameFunctionsServiceProvider).completeGame(
             session.gameId,
             answers,
@@ -219,16 +248,17 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
       state = state.copyWith(
         points: result.score,
         correctAnswers: result.correct ?? state.correctAnswers,
+        isSubmitting: false,
       );
       return result;
     } catch (e) {
-      state = state.copyWith(error: e.toString());
+      state = state.copyWith(isSubmitting: false, error: e.toString());
       return null;
     }
   }
 
   void reset() {
-    _answerByQuestionId.clear();
+    _selectedIndexByQuestionId.clear();
     state = TriviaGameState.initial();
   }
 }

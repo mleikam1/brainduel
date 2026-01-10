@@ -120,6 +120,7 @@ class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> with Ticker
 
   void _finishGameAndGoToResults() {
     final notifier = ref.read(triviaSessionProvider.notifier);
+    _cancelTimers();
     notifier.completeGame().then((result) {
       if (!mounted || result == null) return;
       final state = ref.read(triviaSessionProvider);
@@ -153,91 +154,114 @@ class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> with Ticker
     final state = ref.watch(triviaSessionProvider);
     final points = state.points;
     final isAnswerPhase = state.phase == QuestionPhase.answering;
-    final isReadPhase = state.phase == QuestionPhase.reading;
 
-    return BDAppScaffold(
-      title: 'Solo Match',
-      subtitle: state.session?.topicId.toUpperCase(),
-      child: state.loading
-          ? const Center(child: CircularProgressIndicator())
-          : state.error != null
-          ? Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Failed to start game:\n${state.error}'),
-            const SizedBox(height: 12),
-            FilledButton(
-              onPressed: () {
-                if (categoryId != null) {
-                  ref.read(triviaSessionProvider.notifier).startGame(categoryId!);
-                }
-              },
-              child: const Text('Retry'),
-            )
-          ],
-        ),
-      )
-          : state.session == null
-          ? const Center(child: Text('No session.'))
-          : Padding(
-              padding: const EdgeInsets.all(BrainDuelSpacing.sm),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    alignment: WrapAlignment.spaceBetween,
-                    children: [
-                      BDStatPill(label: 'PTS', value: '$points', icon: Icons.bolt),
-                      BDStatPill(label: 'Mode', value: 'Solo', icon: Icons.flash_on),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Question ${state.currentIndex + 1} of ${state.session!.questionsSnapshot.length}',
-                    style: Theme.of(context).textTheme.labelLarge,
-                  ),
-                  const SizedBox(height: 8),
-                  BDProgressBar(
-                    value: (state.currentIndex + 1) / state.session!.questionsSnapshot.length,
-                  ),
-                  if (isAnswerPhase) ...[
-                    const SizedBox(height: 12),
-                    _AnswerTimerBar(controller: _answerTimerController),
-                  ] else ...[
-                    const SizedBox(height: 12),
-                    Text(
-                      'Read the question first.',
-                      style: Theme.of(context).textTheme.bodySmall,
-                      textAlign: TextAlign.center,
+    return WillPopScope(
+      onWillPop: () async => !state.hasAnsweredAny && !state.isSubmitting,
+      child: BDAppScaffold(
+        title: 'Solo Match',
+        subtitle: state.session?.topicId.toUpperCase(),
+        leading: state.hasAnsweredAny ? const SizedBox.shrink() : null,
+        child: state.loading
+            ? const Center(child: CircularProgressIndicator())
+            : state.error != null
+                ? Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('Failed to start game:\n${state.error}'),
+                        const SizedBox(height: 12),
+                        FilledButton(
+                          onPressed: () {
+                            if (categoryId != null) {
+                              ref.read(triviaSessionProvider.notifier).startGame(categoryId!);
+                            }
+                          },
+                          child: const Text('Retry'),
+                        )
+                      ],
                     ),
-                  ],
-                  const SizedBox(height: 16),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      child: TriviaQuestionView(
-                        session: state.session!,
-                        currentIndex: state.currentIndex,
-                        phase: state.phase,
-                        selectedChoiceId: state.selectedChoiceId,
-                        onSelectAnswer: (id) => ref.read(triviaSessionProvider.notifier).selectAnswer(id),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.lightbulb_outline, color: Theme.of(context).colorScheme.primary),
-                      const SizedBox(width: 6),
-                      Text('Need hint? Coming soon.', style: Theme.of(context).textTheme.bodyMedium),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+                  )
+                : state.session == null
+                    ? const Center(child: Text('No session.'))
+                    : state.isSubmitting
+                        ? Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const CircularProgressIndicator(),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'Hang tight while we collect your score and rank!',
+                                  style: Theme.of(context).textTheme.titleSmall,
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                          )
+                        : AbsorbPointer(
+                            absorbing: state.isSubmitting,
+                            child: Padding(
+                              padding: const EdgeInsets.all(BrainDuelSpacing.sm),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Wrap(
+                                    spacing: 8,
+                                    runSpacing: 8,
+                                    alignment: WrapAlignment.spaceBetween,
+                                    children: [
+                                      BDStatPill(label: 'PTS', value: '$points', icon: Icons.bolt),
+                                      BDStatPill(label: 'Mode', value: 'Solo', icon: Icons.flash_on),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'Question ${state.currentIndex + 1} of ${state.session!.questionsSnapshot.length}',
+                                    style: Theme.of(context).textTheme.labelLarge,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  BDProgressBar(
+                                    value: (state.currentIndex + 1) / state.session!.questionsSnapshot.length,
+                                  ),
+                                  if (isAnswerPhase) ...[
+                                    const SizedBox(height: 12),
+                                    _AnswerTimerBar(controller: _answerTimerController),
+                                  ] else ...[
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      'Read the question first.',
+                                      style: Theme.of(context).textTheme.bodySmall,
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ],
+                                  const SizedBox(height: 16),
+                                  Expanded(
+                                    child: SingleChildScrollView(
+                                      child: TriviaQuestionView(
+                                        session: state.session!,
+                                        currentIndex: state.currentIndex,
+                                        phase: state.phase,
+                                        selectedIndex: state.selectedIndex,
+                                        onSelectAnswer: (index) => ref
+                                            .read(triviaSessionProvider.notifier)
+                                            .selectAnswer(index),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.lightbulb_outline, color: Theme.of(context).colorScheme.primary),
+                                      const SizedBox(width: 6),
+                                      Text('Need hint? Coming soon.', style: Theme.of(context).textTheme.bodyMedium),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+      ),
     );
   }
 }
