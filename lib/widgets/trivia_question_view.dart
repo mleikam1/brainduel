@@ -37,22 +37,9 @@ class TriviaQuestionView extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                q.question,
+                q.prompt,
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
               ),
-              if (q.mediaUrl != null) ...[
-                const SizedBox(height: 12),
-                AspectRatio(
-                  aspectRatio: 16 / 9,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(14),
-                      color: Theme.of(context).colorScheme.primary.withOpacity(0.08),
-                    ),
-                    child: const Center(child: Icon(Icons.image, size: 36)),
-                  ),
-                ),
-              ],
             ],
           ),
         ),
