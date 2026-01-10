@@ -24,7 +24,7 @@ class GameFunctionsService {
     }
   }
 
-  Future<({int score, int maxScore})> completeGame(
+  Future<({int score, int maxScore, int? correct, int? total})> completeGame(
     String gameId,
     List<GameAnswer> answers,
   ) async {
@@ -38,6 +38,8 @@ class GameFunctionsService {
       return (
         score: (data['score'] as num).toInt(),
         maxScore: (data['maxScore'] as num).toInt(),
+        correct: (data['correct'] as num?)?.toInt(),
+        total: (data['total'] as num?)?.toInt(),
       );
     } on FirebaseFunctionsException catch (error) {
       throw GameFunctionsException.fromFirebase(error);
