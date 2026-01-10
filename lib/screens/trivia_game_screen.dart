@@ -119,29 +119,33 @@ class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> with Ticker
   }
 
   void _finishGameAndGoToResults() {
-    final state = ref.read(triviaSessionProvider);
-    final session = state.session!;
-    final correct = state.correctAnswers;
-    final total = session.questions.length;
-    final points = state.points;
+    final notifier = ref.read(triviaSessionProvider.notifier);
+    notifier.completeGame().then((result) {
+      if (!mounted || result == null) return;
+      final state = ref.read(triviaSessionProvider);
+      final session = state.session!;
+      final total = result.total ?? session.questionsSnapshot.length;
+      final correct = result.correct ?? state.correctAnswers;
+      final points = result.score;
 
-    ref.read(userStatsProvider.notifier).recordGame(
-      questions: total,
-      correct: correct,
-      categoryId: session.categoryId,
-    );
+      ref.read(userStatsProvider.notifier).recordGame(
+        questions: total,
+        correct: correct,
+        categoryId: session.topicId,
+      );
 
-    context.goNamed(
-      TriviaApp.namePostQuizAd,
-      extra: {
-        'categoryId': session.categoryId,
-        'correct': correct,
-        'total': total,
-        'points': points,
-        'startedAt': session.startedAt.toIso8601String(),
-        'isPaidUser': ref.read(isPaidUserProvider),
-      },
-    );
+      context.goNamed(
+        TriviaApp.namePostQuizAd,
+        extra: {
+          'categoryId': session.topicId,
+          'correct': correct,
+          'total': total,
+          'points': points,
+          'startedAt': state.startedAt?.toIso8601String(),
+          'isPaidUser': ref.read(isPaidUserProvider),
+        },
+      );
+    });
   }
 
   @override
@@ -153,7 +157,7 @@ class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> with Ticker
 
     return BDAppScaffold(
       title: 'Solo Match',
-      subtitle: state.session?.categoryId.toUpperCase(),
+      subtitle: state.session?.topicId.toUpperCase(),
       child: state.loading
           ? const Center(child: CircularProgressIndicator())
           : state.error != null
@@ -192,12 +196,12 @@ class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> with Ticker
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Question ${state.currentIndex + 1} of ${state.session!.questions.length}',
+                    'Question ${state.currentIndex + 1} of ${state.session!.questionsSnapshot.length}',
                     style: Theme.of(context).textTheme.labelLarge,
                   ),
                   const SizedBox(height: 8),
                   BDProgressBar(
-                    value: (state.currentIndex + 1) / state.session!.questions.length,
+                    value: (state.currentIndex + 1) / state.session!.questionsSnapshot.length,
                   ),
                   if (isAnswerPhase) ...[
                     const SizedBox(height: 12),
@@ -217,7 +221,7 @@ class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> with Ticker
                         session: state.session!,
                         currentIndex: state.currentIndex,
                         phase: state.phase,
-                        selectedAnswer: state.selectedAnswer,
+                        selectedChoiceId: state.selectedChoiceId,
                         onSelectAnswer: (id) => ref.read(triviaSessionProvider.notifier).selectAnswer(id),
                       ),
                     ),

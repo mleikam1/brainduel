@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import '../models/trivia_answer.dart';
-import '../models/trivia_session.dart';
+import '../models/game_session.dart';
 import '../state/trivia_session_provider.dart';
 import 'bd_answer_option_tile.dart';
 import 'bd_card.dart';
@@ -11,20 +10,20 @@ class TriviaQuestionView extends StatelessWidget {
     required this.session,
     required this.currentIndex,
     required this.phase,
-    required this.selectedAnswer,
+    required this.selectedChoiceId,
     required this.onSelectAnswer,
   });
 
-  final TriviaSession session;
+  final GameSession session;
   final int currentIndex;
   final QuestionPhase phase;
-  final TriviaAnswer? selectedAnswer;
+  final String? selectedChoiceId;
   final void Function(String answerId) onSelectAnswer;
 
   @override
   Widget build(BuildContext context) {
-    final q = session.questions[currentIndex];
-    final answers = q.displayAnswers;
+    final q = session.questionsSnapshot[currentIndex];
+    final answers = q.choices;
     final showAnswers = phase != QuestionPhase.reading;
     final isAnswering = phase == QuestionPhase.answering;
     final isAnswered = phase == QuestionPhase.answered;
@@ -65,22 +64,20 @@ class TriviaQuestionView extends StatelessWidget {
                   key: const ValueKey('answers'),
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    ...answers.map((a) {
-                      final isSelected = selectedAnswer?.id == a.id;
-                      BDAnswerState state = BDAnswerState.idle;
-
-                      if (isAnswered && isSelected) {
-                        state = selectedAnswer?.correct == true
-                            ? BDAnswerState.correct
-                            : BDAnswerState.incorrect;
-                      }
+                    ...answers.map((choice) {
+                      final isSelected = selectedChoiceId == choice;
+                      final state = isAnswered && isSelected
+                          ? BDAnswerState.selected
+                          : isAnswering
+                              ? BDAnswerState.idle
+                              : BDAnswerState.disabled;
 
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 12),
                         child: BDAnswerOptionTile(
-                          text: a.text,
+                          text: choice,
                           state: state,
-                          onTap: isAnswering ? () => onSelectAnswer(a.id) : null,
+                          onTap: isAnswering ? () => onSelectAnswer(choice) : null,
                         ),
                       );
                     }),

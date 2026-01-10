@@ -1,13 +1,8 @@
-import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../models/trivia_pack.dart';
-import '../models/trivia_answer.dart';
-import '../models/trivia_session.dart';
-import '../services/storage_content_service.dart';
-import '../services/content_cache_service.dart';
-import '../services/trivia_session_builder.dart';
+import '../models/game_answer.dart';
+import '../models/game_session.dart';
 import '../services/analytics_service.dart';
-import 'categories_provider.dart';
+import '../services/game_functions_service.dart';
 
 enum QuestionPhase {
   reading,
@@ -18,15 +13,16 @@ enum QuestionPhase {
 class TriviaGameState {
   final bool loading;
   final String? error;
-  final TriviaSession? session;
+  final GameSession? session;
   final int currentIndex;
   final int points;
   final int correctAnswers;
-  final TriviaAnswer? selectedAnswer;
+  final String? selectedChoiceId;
   final bool isAnswered;
   final bool isTimedOut;
   final QuestionPhase phase;
   final DateTime? answerPhaseStartedAt;
+  final DateTime? startedAt;
 
   const TriviaGameState({
     required this.loading,
@@ -35,11 +31,12 @@ class TriviaGameState {
     required this.currentIndex,
     required this.points,
     required this.correctAnswers,
-    required this.selectedAnswer,
+    required this.selectedChoiceId,
     required this.isAnswered,
     required this.isTimedOut,
     required this.phase,
     required this.answerPhaseStartedAt,
+    required this.startedAt,
   });
 
   factory TriviaGameState.initial() => const TriviaGameState(
@@ -49,25 +46,27 @@ class TriviaGameState {
     currentIndex: 0,
     points: 0,
     correctAnswers: 0,
-    selectedAnswer: null,
+    selectedChoiceId: null,
     isAnswered: false,
     isTimedOut: false,
     phase: QuestionPhase.reading,
     answerPhaseStartedAt: null,
+    startedAt: null,
   );
 
   TriviaGameState copyWith({
     bool? loading,
     String? error,
-    TriviaSession? session,
+    GameSession? session,
     int? currentIndex,
     int? points,
     int? correctAnswers,
-    TriviaAnswer? selectedAnswer,
+    String? selectedChoiceId,
     bool? isAnswered,
     bool? isTimedOut,
     QuestionPhase? phase,
     DateTime? answerPhaseStartedAt,
+    DateTime? startedAt,
   }) {
     return TriviaGameState(
       loading: loading ?? this.loading,
@@ -76,21 +75,18 @@ class TriviaGameState {
       currentIndex: currentIndex ?? this.currentIndex,
       points: points ?? this.points,
       correctAnswers: correctAnswers ?? this.correctAnswers,
-      selectedAnswer: selectedAnswer ?? this.selectedAnswer,
+      selectedChoiceId: selectedChoiceId ?? this.selectedChoiceId,
       isAnswered: isAnswered ?? this.isAnswered,
       isTimedOut: isTimedOut ?? this.isTimedOut,
       phase: phase ?? this.phase,
       answerPhaseStartedAt: answerPhaseStartedAt ?? this.answerPhaseStartedAt,
+      startedAt: startedAt ?? this.startedAt,
     );
   }
 }
 
 final analyticsServiceProvider = Provider<AnalyticsService>((ref) {
   return AnalyticsService();
-});
-
-final triviaSessionBuilderProvider = Provider<TriviaSessionBuilder>((ref) {
-  return TriviaSessionBuilder();
 });
 
 final triviaSessionProvider =
@@ -102,47 +98,33 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
   TriviaSessionNotifier(this.ref) : super(TriviaGameState.initial());
 
   final Ref ref;
+  final Map<String, GameAnswer> _answerByQuestionId = {};
+  final Set<String> _completedGameIds = {};
 
   Future<void> startGame(String categoryId) async {
     state = state.copyWith(loading: true, error: null);
     try {
-      final storage = ref.read(storageContentServiceProvider);
-      final cache = ref.read(contentCacheServiceProvider);
-      final builder = ref.read(triviaSessionBuilderProvider);
+      final gameFunctions = ref.read(gameFunctionsServiceProvider);
       final analytics = ref.read(analyticsServiceProvider);
-      final packPath = ref.read(categoryPackPathProvider(categoryId));
-
-      final packText = await cache.getCachedOrFetch(
-        key: 'pack_$packPath',
-        version: 1,
-        fetcher: () => storage.downloadTextFile(packPath),
-      );
-
-      final decoded = json.decode(packText) as Map<String, dynamic>;
-      final pack = TriviaPack.fromJson(decoded);
-
-      if (pack.questions.length < kTriviaQuestionCount) {
-        analytics.logEvent(
-          'trivia_pack_insufficient_questions',
-          parameters: {
-            'categoryId': categoryId,
-            'available': pack.questions.length,
-            'required': kTriviaQuestionCount,
-          },
-        );
+      final session = await gameFunctions.createGame(categoryId);
+      // Fairness requires server-generated question snapshots so clients cannot reshuffle or peek at answers.
+      if (_completedGameIds.contains(session.gameId)) {
         state = state.copyWith(
           loading: false,
           session: null,
-          error: 'More questions coming soon for this topic.',
+          error: 'That game has already been completed.',
         );
         return;
       }
 
-      final session = builder.buildSession(pack: pack);
+      analytics.logEvent('game_started', parameters: {'topicId': categoryId});
 
-      analytics.logEvent('game_started', parameters: {'categoryId': categoryId});
-
-      state = TriviaGameState.initial().copyWith(session: session, loading: false);
+      _answerByQuestionId.clear();
+      state = TriviaGameState.initial().copyWith(
+        session: session,
+        loading: false,
+        startedAt: DateTime.now(),
+      );
     } catch (e) {
       state = state.copyWith(loading: false, error: e.toString());
     }
@@ -163,22 +145,14 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
     if (state.isAnswered) return;
     if (state.phase != QuestionPhase.answering) return;
 
-    final q = session.questions[state.currentIndex];
-    final selected = q.displayAnswers.firstWhere((a) => a.id == answerId);
-    final correct = selected.correct;
-    final startedAt = state.answerPhaseStartedAt ?? DateTime.now();
-    final elapsedSeconds = DateTime.now().difference(startedAt).inSeconds;
-    final withinTime = elapsedSeconds < 10;
-    final earnedPoints = correct && withinTime ? (100 - (10 * elapsedSeconds)) : 0;
-    final clampedPoints = earnedPoints.clamp(0, 100);
+    final q = session.questionsSnapshot[state.currentIndex];
+    _answerByQuestionId[q.id] = GameAnswer(questionId: q.id, choice: answerId);
 
     state = state.copyWith(
-      selectedAnswer: selected,
+      selectedChoiceId: answerId,
       isAnswered: true,
       isTimedOut: false,
       phase: QuestionPhase.answered,
-      points: state.points + clampedPoints,
-      correctAnswers: correct ? state.correctAnswers + 1 : state.correctAnswers,
     );
 
     ref.read(analyticsServiceProvider).logEvent(
@@ -186,9 +160,6 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
       parameters: {
         'questionId': q.id,
         'answerId': answerId,
-        'correct': correct,
-        'elapsedSeconds': elapsedSeconds,
-        'points': clampedPoints,
       },
     );
   }
@@ -196,7 +167,7 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
   bool get isLastQuestion {
     final session = state.session;
     if (session == null) return true;
-    return state.currentIndex >= session.questions.length - 1;
+    return state.currentIndex >= session.questionsSnapshot.length - 1;
   }
 
   void nextQuestion() {
@@ -207,7 +178,7 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
 
     state = state.copyWith(
       currentIndex: state.currentIndex + 1,
-      selectedAnswer: null,
+      selectedChoiceId: null,
       isAnswered: false,
       isTimedOut: false,
       error: null,
@@ -221,14 +192,43 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
     if (state.isAnswered) return;
 
     state = state.copyWith(
-      selectedAnswer: null,
+      selectedChoiceId: null,
       isAnswered: true,
       isTimedOut: true,
       phase: QuestionPhase.answered,
     );
   }
 
+  Future<({int score, int maxScore, int? correct, int? total})?> completeGame() async {
+    final session = state.session;
+    if (session == null) return null;
+    if (_completedGameIds.contains(session.gameId)) {
+      state = state.copyWith(error: 'That game has already been completed.');
+      return null;
+    }
+    try {
+      final answers = session.questionsSnapshot
+          .map((question) => _answerByQuestionId[question.id])
+          .whereType<GameAnswer>()
+          .toList();
+      final result = await ref.read(gameFunctionsServiceProvider).completeGame(
+            session.gameId,
+            answers,
+          );
+      _completedGameIds.add(session.gameId);
+      state = state.copyWith(
+        points: result.score,
+        correctAnswers: result.correct ?? state.correctAnswers,
+      );
+      return result;
+    } catch (e) {
+      state = state.copyWith(error: e.toString());
+      return null;
+    }
+  }
+
   void reset() {
+    _answerByQuestionId.clear();
     state = TriviaGameState.initial();
   }
 }
