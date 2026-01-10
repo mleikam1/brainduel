@@ -110,7 +110,7 @@ final analyticsServiceProvider = Provider<AnalyticsService>((ref) {
 });
 
 final triviaSessionProvider =
-StateNotifierProvider<TriviaSessionNotifier, TriviaGameState>((ref) {
+    StateNotifierProvider<TriviaSessionNotifier, TriviaGameState>((ref) {
   return TriviaSessionNotifier(ref);
 });
 
@@ -122,17 +122,34 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
   final Set<String> _completedGameIds = {};
 
   String _formatError(Object error) {
-    if (error is GameFunctionsException && _isAlreadyCompletedError(error)) {
-      return 'That game has already been completed.';
+    if (error is GameFunctionsException) {
+      return _messageForFunctionsError(error);
     }
     return error.toString();
+  }
+
+  String _messageForFunctionsError(GameFunctionsException error) {
+    if (_isAlreadyCompletedError(error)) {
+      return 'That game has already been completed.';
+    }
+    switch (error.code) {
+      case 'unauthenticated':
+        return 'Please sign in to continue.';
+      case 'failed-precondition':
+        return 'This game is not available right now.';
+      case 'not-found':
+        return 'That game could not be found.';
+      default:
+        return error.message ?? 'Something went wrong. Please try again.';
+    }
   }
 
   bool _isAlreadyCompletedError(GameFunctionsException error) {
     final message = (error.message ?? '').toLowerCase();
     final details = error.details?.toString().toLowerCase() ?? '';
     if (error.code == 'already-completed') return true;
-    if (error.code == 'failed-precondition' && (message.contains('completed') || details.contains('completed'))) {
+    if (error.code == 'failed-precondition' &&
+        (message.contains('completed') || details.contains('completed'))) {
       return true;
     }
     return message.contains('already completed') || details.contains('already completed');
@@ -148,6 +165,16 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
       isLocked: true,
       showAlreadyCompletedModal: true,
       error: message ?? 'That game has already been completed.',
+    );
+  }
+
+  void _logGameFailed(String stage, {String? code}) {
+    ref.read(analyticsServiceProvider).logEvent(
+      'trivia_game_failed',
+      parameters: {
+        'stage': stage,
+        if (code != null) 'code': code,
+      },
     );
   }
 
@@ -167,7 +194,11 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
         return;
       }
 
-      analytics.logEvent('game_started', parameters: {'topicId': categoryId});
+      analytics.logEvent('trivia_game_started', parameters: {
+        'topicId': categoryId,
+        'gameId': session.gameId,
+        'source': 'category',
+      });
 
       _selectedIndexByQuestionId.clear();
       state = TriviaGameState.initial().copyWith(
@@ -176,9 +207,19 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
         startedAt: DateTime.now(),
       );
     } catch (e) {
-      if (e is GameFunctionsException && _isAlreadyCompletedError(e)) {
-        state = _markAlreadyCompleted(state.copyWith(loading: false));
+      if (e is GameFunctionsException) {
+        _logGameFailed('start', code: e.code);
+        if (_isAlreadyCompletedError(e)) {
+          state = _markAlreadyCompleted(
+            state.copyWith(loading: false),
+            message: _messageForFunctionsError(e),
+          );
+        } else {
+          state =
+              state.copyWith(loading: false, error: _messageForFunctionsError(e));
+        }
       } else {
+        _logGameFailed('start');
         state = state.copyWith(loading: false, error: _formatError(e));
       }
     }
@@ -198,7 +239,10 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
         );
         return;
       }
-      analytics.logEvent('shared_game_loaded', parameters: {'gameId': gameId});
+      analytics.logEvent('trivia_game_started', parameters: {
+        'gameId': gameId,
+        'source': 'shared',
+      });
 
       _selectedIndexByQuestionId.clear();
       state = TriviaGameState.initial().copyWith(
@@ -207,9 +251,19 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
         startedAt: DateTime.now(),
       );
     } catch (e) {
-      if (e is GameFunctionsException && _isAlreadyCompletedError(e)) {
-        state = _markAlreadyCompleted(state.copyWith(loading: false));
+      if (e is GameFunctionsException) {
+        _logGameFailed('load', code: e.code);
+        if (_isAlreadyCompletedError(e)) {
+          state = _markAlreadyCompleted(
+            state.copyWith(loading: false),
+            message: _messageForFunctionsError(e),
+          );
+        } else {
+          state =
+              state.copyWith(loading: false, error: _messageForFunctionsError(e));
+        }
       } else {
+        _logGameFailed('load');
         state = state.copyWith(loading: false, error: _formatError(e));
       }
     }
@@ -236,8 +290,6 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
     if (_selectedIndexByQuestionId.containsKey(q.id)) return;
     if (answerIndex < 0 || answerIndex >= q.choices.length) return;
     _selectedIndexByQuestionId[q.id] = answerIndex;
-    final answerId = q.choices[answerIndex];
-
     state = state.copyWith(
       selectedIndex: answerIndex,
       isAnswered: true,
@@ -247,10 +299,9 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
     );
 
     ref.read(analyticsServiceProvider).logEvent(
-      'answer_selected',
+      'trivia_answer_selected',
       parameters: {
         'questionId': q.id,
-        'answerId': answerId,
       },
     );
   }
@@ -298,7 +349,8 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
     );
   }
 
-  Future<({int score, int maxScore, int? correct, int? total})?> completeGame() async {
+  Future<({int score, int maxScore, int? correct, int? total})?>
+      completeGame() async {
     final session = state.session;
     if (session == null) return null;
     if (_completedGameIds.contains(session.gameId)) {
@@ -326,11 +378,32 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
         isSubmitting: false,
         isLocked: true,
       );
+      ref.read(analyticsServiceProvider).logEvent(
+        'trivia_game_completed',
+        parameters: {
+          'gameId': session.gameId,
+          'score': result.score,
+          'maxScore': result.maxScore,
+          'total': result.total ?? session.questionsSnapshot.length,
+        },
+      );
       return result;
     } catch (e) {
-      if (e is GameFunctionsException && _isAlreadyCompletedError(e)) {
-        state = _markAlreadyCompleted(state);
+      if (e is GameFunctionsException) {
+        _logGameFailed('complete', code: e.code);
+        if (_isAlreadyCompletedError(e)) {
+          state = _markAlreadyCompleted(
+            state,
+            message: _messageForFunctionsError(e),
+          );
+        } else {
+          state = state.copyWith(
+            isSubmitting: false,
+            error: _messageForFunctionsError(e),
+          );
+        }
       } else {
+        _logGameFailed('complete');
         state = state.copyWith(isSubmitting: false, error: _formatError(e));
       }
       return null;
