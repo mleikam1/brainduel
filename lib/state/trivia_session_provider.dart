@@ -111,6 +111,23 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
   final Map<String, int> _selectedIndexByQuestionId = {};
   final Set<String> _completedGameIds = {};
 
+  String _formatError(Object error) {
+    if (error is GameFunctionsException && _isAlreadyCompletedError(error)) {
+      return 'That game has already been completed.';
+    }
+    return error.toString();
+  }
+
+  bool _isAlreadyCompletedError(GameFunctionsException error) {
+    final message = (error.message ?? '').toLowerCase();
+    final details = error.details?.toString().toLowerCase() ?? '';
+    if (error.code == 'already-completed') return true;
+    if (error.code == 'failed-precondition' && (message.contains('completed') || details.contains('completed'))) {
+      return true;
+    }
+    return message.contains('already completed') || details.contains('already completed');
+  }
+
   Future<void> startGame(String categoryId) async {
     state = state.copyWith(loading: true, error: null);
     try {
@@ -136,7 +153,34 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
         startedAt: DateTime.now(),
       );
     } catch (e) {
-      state = state.copyWith(loading: false, error: e.toString());
+      state = state.copyWith(loading: false, error: _formatError(e));
+    }
+  }
+
+  Future<void> loadGame(String gameId) async {
+    state = state.copyWith(loading: true, error: null);
+    try {
+      final gameFunctions = ref.read(gameFunctionsServiceProvider);
+      final analytics = ref.read(analyticsServiceProvider);
+      final session = await gameFunctions.loadGame(gameId);
+      if (_completedGameIds.contains(session.gameId)) {
+        state = state.copyWith(
+          loading: false,
+          session: null,
+          error: 'That game has already been completed.',
+        );
+        return;
+      }
+      analytics.logEvent('shared_game_loaded', parameters: {'gameId': gameId});
+
+      _selectedIndexByQuestionId.clear();
+      state = TriviaGameState.initial().copyWith(
+        session: session,
+        loading: false,
+        startedAt: DateTime.now(),
+      );
+    } catch (e) {
+      state = state.copyWith(loading: false, error: _formatError(e));
     }
   }
 
@@ -252,7 +296,7 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
       );
       return result;
     } catch (e) {
-      state = state.copyWith(isSubmitting: false, error: e.toString());
+      state = state.copyWith(isSubmitting: false, error: _formatError(e));
       return null;
     }
   }

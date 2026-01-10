@@ -24,6 +24,17 @@ class GameFunctionsService {
     }
   }
 
+  Future<GameSession> loadGame(String gameId) async {
+    try {
+      final callable = _functions.httpsCallable('loadGame');
+      final result = await callable.call({'gameId': gameId});
+      final data = _requireMap(result.data, 'loadGame');
+      return GameSession.fromJson(data);
+    } on FirebaseFunctionsException catch (error) {
+      throw GameFunctionsException.fromFirebase(error);
+    }
+  }
+
   Future<({int score, int maxScore, int? correct, int? total})> completeGame(
     String gameId,
     List<GameAnswer> answers,
