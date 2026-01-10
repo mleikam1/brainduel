@@ -25,6 +25,8 @@ class TriviaGameState {
   final QuestionPhase phase;
   final DateTime? answerPhaseStartedAt;
   final DateTime? startedAt;
+  final bool isLocked;
+  final bool showAlreadyCompletedModal;
 
   const TriviaGameState({
     required this.loading,
@@ -41,6 +43,8 @@ class TriviaGameState {
     required this.phase,
     required this.answerPhaseStartedAt,
     required this.startedAt,
+    required this.isLocked,
+    required this.showAlreadyCompletedModal,
   });
 
   factory TriviaGameState.initial() => const TriviaGameState(
@@ -58,6 +62,8 @@ class TriviaGameState {
     phase: QuestionPhase.reading,
     answerPhaseStartedAt: null,
     startedAt: null,
+    isLocked: false,
+    showAlreadyCompletedModal: false,
   );
 
   TriviaGameState copyWith({
@@ -75,6 +81,8 @@ class TriviaGameState {
     QuestionPhase? phase,
     DateTime? answerPhaseStartedAt,
     DateTime? startedAt,
+    bool? isLocked,
+    bool? showAlreadyCompletedModal,
   }) {
     return TriviaGameState(
       loading: loading ?? this.loading,
@@ -91,6 +99,8 @@ class TriviaGameState {
       phase: phase ?? this.phase,
       answerPhaseStartedAt: answerPhaseStartedAt ?? this.answerPhaseStartedAt,
       startedAt: startedAt ?? this.startedAt,
+      isLocked: isLocked ?? this.isLocked,
+      showAlreadyCompletedModal: showAlreadyCompletedModal ?? this.showAlreadyCompletedModal,
     );
   }
 }
@@ -128,6 +138,19 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
     return message.contains('already completed') || details.contains('already completed');
   }
 
+  TriviaGameState _markAlreadyCompleted(TriviaGameState current, {String? message}) {
+    final session = current.session;
+    if (session != null) {
+      _completedGameIds.add(session.gameId);
+    }
+    return current.copyWith(
+      isSubmitting: false,
+      isLocked: true,
+      showAlreadyCompletedModal: true,
+      error: message ?? 'That game has already been completed.',
+    );
+  }
+
   Future<void> startGame(String categoryId) async {
     state = state.copyWith(loading: true, error: null);
     try {
@@ -153,7 +176,11 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
         startedAt: DateTime.now(),
       );
     } catch (e) {
-      state = state.copyWith(loading: false, error: _formatError(e));
+      if (e is GameFunctionsException && _isAlreadyCompletedError(e)) {
+        state = _markAlreadyCompleted(state.copyWith(loading: false));
+      } else {
+        state = state.copyWith(loading: false, error: _formatError(e));
+      }
     }
   }
 
@@ -180,7 +207,11 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
         startedAt: DateTime.now(),
       );
     } catch (e) {
-      state = state.copyWith(loading: false, error: _formatError(e));
+      if (e is GameFunctionsException && _isAlreadyCompletedError(e)) {
+        state = _markAlreadyCompleted(state.copyWith(loading: false));
+      } else {
+        state = state.copyWith(loading: false, error: _formatError(e));
+      }
     }
   }
 
@@ -271,7 +302,7 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
     final session = state.session;
     if (session == null) return null;
     if (_completedGameIds.contains(session.gameId)) {
-      state = state.copyWith(error: 'That game has already been completed.');
+      state = _markAlreadyCompleted(state);
       return null;
     }
     try {
@@ -293,12 +324,22 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
         points: result.score,
         correctAnswers: result.correct ?? state.correctAnswers,
         isSubmitting: false,
+        isLocked: true,
       );
       return result;
     } catch (e) {
-      state = state.copyWith(isSubmitting: false, error: _formatError(e));
+      if (e is GameFunctionsException && _isAlreadyCompletedError(e)) {
+        state = _markAlreadyCompleted(state);
+      } else {
+        state = state.copyWith(isSubmitting: false, error: _formatError(e));
+      }
       return null;
     }
+  }
+
+  void dismissAlreadyCompletedModal() {
+    if (!state.showAlreadyCompletedModal) return;
+    state = state.copyWith(showAlreadyCompletedModal: false);
   }
 
   void reset() {
