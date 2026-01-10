@@ -52,6 +52,13 @@ class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> with Ticker
       vsync: this,
       duration: const Duration(seconds: _answerSeconds),
     );
+    ref.listen(triviaSessionProvider, (previous, next) {
+      final wasShowing = previous?.showAlreadyCompletedModal ?? false;
+      if (next.showAlreadyCompletedModal && !wasShowing) {
+        _showAlreadyCompletedDialog();
+        ref.read(triviaSessionProvider.notifier).dismissAlreadyCompletedModal();
+      }
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _resolveLaunchArgs();
@@ -178,6 +185,25 @@ class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> with Ticker
     });
   }
 
+  Future<void> _showAlreadyCompletedDialog() async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Quiz already completed'),
+        content: const Text(
+          'This quiz has already been completed. Each quiz can only be played once.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(triviaSessionProvider);
@@ -185,11 +211,11 @@ class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> with Ticker
     final isAnswerPhase = state.phase == QuestionPhase.answering;
 
     return WillPopScope(
-      onWillPop: () async => !state.hasAnsweredAny && !state.isSubmitting,
+      onWillPop: () async => !state.hasAnsweredAny && !state.isSubmitting && !state.isLocked,
       child: BDAppScaffold(
         title: 'Solo Match',
         subtitle: state.session?.topicId.toUpperCase(),
-        leading: state.hasAnsweredAny ? const SizedBox.shrink() : null,
+        leading: state.hasAnsweredAny || state.isLocked ? const SizedBox.shrink() : null,
         child: state.loading
             ? const Center(child: CircularProgressIndicator())
             : state.error != null
