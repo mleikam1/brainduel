@@ -1,0 +1,71 @@
+import 'package:firebase_functions/firebase_functions.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../models/game_answer.dart';
+import '../models/game_session.dart';
+
+final gameFunctionsServiceProvider = Provider<GameFunctionsService>((ref) {
+  return GameFunctionsService(FirebaseFunctions.instance);
+});
+
+class GameFunctionsService {
+  GameFunctionsService(this._functions);
+
+  final FirebaseFunctions _functions;
+
+  Future<GameSession> createGame(String topicId) async {
+    try {
+      final callable = _functions.httpsCallable('createGame');
+      final result = await callable.call({'topicId': topicId});
+      final data = _requireMap(result.data, 'createGame');
+      return GameSession.fromJson(data);
+    } on FirebaseFunctionsException catch (error) {
+      throw GameFunctionsException.fromFirebase(error);
+    }
+  }
+
+  Future<({int score, int maxScore})> completeGame(
+    String gameId,
+    List<GameAnswer> answers,
+  ) async {
+    try {
+      final callable = _functions.httpsCallable('completeGame');
+      final result = await callable.call({
+        'gameId': gameId,
+        'answers': answers.map((answer) => answer.toJson()).toList(),
+      });
+      final data = _requireMap(result.data, 'completeGame');
+      return (
+        score: (data['score'] as num).toInt(),
+        maxScore: (data['maxScore'] as num).toInt(),
+      );
+    } on FirebaseFunctionsException catch (error) {
+      throw GameFunctionsException.fromFirebase(error);
+    }
+  }
+
+  Map<String, dynamic> _requireMap(Object? payload, String functionName) {
+    if (payload is Map<String, dynamic>) {
+      return payload;
+    }
+    if (payload is Map) {
+      return Map<String, dynamic>.from(payload);
+    }
+    throw StateError('Unexpected $functionName response payload.');
+  }
+}
+
+class GameFunctionsException implements Exception {
+  GameFunctionsException(this.code, this.message, [this.details]);
+
+  factory GameFunctionsException.fromFirebase(FirebaseFunctionsException error) {
+    return GameFunctionsException(error.code, error.message, error.details);
+  }
+
+  final String code;
+  final String? message;
+  final Object? details;
+
+  @override
+  String toString() => 'GameFunctionsException($code, $message, $details)';
+}
