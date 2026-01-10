@@ -19,8 +19,17 @@ class TriviaGameScreen extends ConsumerStatefulWidget {
   ConsumerState<TriviaGameScreen> createState() => _TriviaGameScreenState();
 }
 
+class TriviaGameLaunchArgs {
+  const TriviaGameLaunchArgs({this.categoryId, this.gameId});
+
+  final String? categoryId;
+  final String? gameId;
+
+  bool get isShared => gameId != null && gameId!.isNotEmpty;
+}
+
 class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> with TickerProviderStateMixin {
-  String? categoryId;
+  TriviaGameLaunchArgs? _launchArgs;
   Timer? _readTimer;
   Timer? _answerTimer;
   Timer? _advanceTimer;
@@ -33,7 +42,7 @@ class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> with Ticker
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    categoryId ??= ModalRoute.of(context)?.settings.arguments as String?;
+    _resolveLaunchArgs();
   }
 
   @override
@@ -45,11 +54,16 @@ class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> with Ticker
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      categoryId ??= ModalRoute.of(context)?.settings.arguments as String?;
-      if (categoryId != null && !_started) {
-        ref.read(triviaSessionProvider.notifier).startGame(categoryId!);
-        _started = true;
+      _resolveLaunchArgs();
+      final launchArgs = _launchArgs;
+      if (launchArgs == null || _started) return;
+      final notifier = ref.read(triviaSessionProvider.notifier);
+      if (launchArgs.isShared) {
+        notifier.loadGame(launchArgs.gameId!);
+      } else if (launchArgs.categoryId != null) {
+        notifier.startGame(launchArgs.categoryId!);
       }
+      _started = true;
     });
     _sessionSubscription = ref.listenManual(triviaSessionProvider, (previous, next) {
       if (next.session != null &&
@@ -61,6 +75,21 @@ class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> with Ticker
         _scheduleAdvance();
       }
     });
+  }
+
+  void _resolveLaunchArgs() {
+    if (_launchArgs != null) return;
+    final args = ModalRoute.of(context)?.settings.arguments;
+    if (args is TriviaGameLaunchArgs) {
+      _launchArgs = args;
+    } else if (args is Map) {
+      _launchArgs = TriviaGameLaunchArgs(
+        categoryId: args['categoryId'] as String?,
+        gameId: args['gameId'] as String?,
+      );
+    } else if (args is String) {
+      _launchArgs = TriviaGameLaunchArgs(categoryId: args);
+    }
   }
 
   @override
@@ -172,8 +201,13 @@ class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> with Ticker
                         const SizedBox(height: 12),
                         FilledButton(
                           onPressed: () {
-                            if (categoryId != null) {
-                              ref.read(triviaSessionProvider.notifier).startGame(categoryId!);
+                            final launchArgs = _launchArgs;
+                            if (launchArgs == null) return;
+                            final notifier = ref.read(triviaSessionProvider.notifier);
+                            if (launchArgs.isShared) {
+                              notifier.loadGame(launchArgs.gameId!);
+                            } else if (launchArgs.categoryId != null) {
+                              notifier.startGame(launchArgs.categoryId!);
                             }
                           },
                           child: const Text('Retry'),

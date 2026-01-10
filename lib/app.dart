@@ -34,6 +34,7 @@ class TriviaApp extends StatelessWidget {
   static const routeProfile = '/profile';
   static const routeSettings = '/settings';
   static const routeSeasonalEvent = '/events/seasonal';
+  static const routeSharedGame = '/g/:gameId';
 
   static const nameOnboarding = 'onboarding';
   static const nameGuestAuth = 'guestAuth';
@@ -48,6 +49,7 @@ class TriviaApp extends StatelessWidget {
   static const nameProfile = 'profile';
   static const nameSettings = 'settings';
   static const nameSeasonalEvent = 'seasonalEvent';
+  static const nameSharedGame = 'sharedGame';
   static const nameChallengeIntro = 'challengeIntro';
   static const nameQuestionFlow = 'questionFlow';
   static const nameFollowLink = 'followLink';
@@ -104,6 +106,15 @@ class TriviaApp extends StatelessWidget {
         pageBuilder: (context, state) => MaterialPage(
           key: state.pageKey,
           arguments: state.extra,
+          child: const TriviaGameScreen(),
+        ),
+      ),
+      GoRoute(
+        path: routeSharedGame,
+        name: nameSharedGame,
+        pageBuilder: (context, state) => MaterialPage(
+          key: state.pageKey,
+          arguments: TriviaGameLaunchArgs(gameId: state.pathParameters['gameId']),
           child: const TriviaGameScreen(),
         ),
       ),
