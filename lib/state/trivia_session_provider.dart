@@ -3,6 +3,8 @@ import '../models/game_answer.dart';
 import '../models/game_session.dart';
 import '../services/analytics_service.dart';
 import '../services/game_functions_service.dart';
+import 'auth_provider.dart';
+import 'categories_provider.dart';
 
 enum QuestionPhase {
   reading,
@@ -120,6 +122,7 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
   final Ref ref;
   final Map<String, int> _selectedIndexByQuestionId = {};
   final Set<String> _completedGameIds = {};
+  bool _isStarting = false;
 
   String _formatError(Object error) {
     if (error is GameFunctionsException) {
@@ -179,11 +182,36 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
   }
 
   Future<void> startGame(String categoryId) async {
+    if (state.loading || _isStarting) return;
+    final trimmedCategoryId = categoryId.trim();
+    if (trimmedCategoryId.isEmpty) {
+      state = state.copyWith(error: 'Please choose a category to continue.');
+      return;
+    }
+    final userId = ref.read(authUserIdProvider);
+    if (userId == null || userId.isEmpty) {
+      state = state.copyWith(error: 'Please sign in to continue.');
+      return;
+    }
+    _isStarting = true;
     state = state.copyWith(loading: true, error: null);
     try {
+      final categories = await ref.read(categoriesProvider.future);
+      final categoryExists = categories.any((category) => category.id == trimmedCategoryId);
+      if (!categoryExists) {
+        state = state.copyWith(
+          loading: false,
+          error: 'That category is not available right now.',
+        );
+        return;
+      }
+      final topicId = ref.read(categoryPackPathProvider(trimmedCategoryId));
       final gameFunctions = ref.read(gameFunctionsServiceProvider);
       final analytics = ref.read(analyticsServiceProvider);
-      final session = await gameFunctions.createGame(categoryId);
+      final session = await gameFunctions.createGame(
+        topicId: topicId,
+        mode: 'solo',
+      );
       // Fairness requires server-generated question snapshots so clients cannot reshuffle or peek at answers.
       if (_completedGameIds.contains(session.gameId)) {
         state = state.copyWith(
@@ -195,7 +223,9 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
       }
 
       analytics.logEvent('trivia_game_started', parameters: {
-        'topicId': categoryId,
+        'topicId': trimmedCategoryId,
+        'packId': topicId,
+        'mode': 'solo',
         'gameId': session.gameId,
         'source': 'category',
       });
@@ -222,6 +252,8 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
         _logGameFailed('start');
         state = state.copyWith(loading: false, error: _formatError(e));
       }
+    } finally {
+      _isStarting = false;
     }
   }
 
