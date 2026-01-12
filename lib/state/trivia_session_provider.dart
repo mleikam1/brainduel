@@ -3,6 +3,7 @@ import '../models/game_answer.dart';
 import '../models/game_session.dart';
 import '../services/analytics_service.dart';
 import '../services/game_functions_service.dart';
+import '../services/local_solo_game_service.dart';
 import 'auth_provider.dart';
 import 'categories_provider.dart';
 
@@ -122,6 +123,8 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
   final Ref ref;
   final Map<String, int> _selectedIndexByQuestionId = {};
   final Set<String> _completedGameIds = {};
+  final Map<String, String> _localCorrectChoiceByQuestionId = {};
+  String? _localSessionGameId;
   bool _isStarting = false;
 
   String _formatError(Object error) {
@@ -194,6 +197,39 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
     );
   }
 
+  bool _validateQuestionCount(GameSession session) {
+    if (session.questionsSnapshot.length < kMinimumSoloQuestionCount) {
+      state = state.copyWith(
+        loading: false,
+        error:
+            'Solo matches need at least $kMinimumSoloQuestionCount questions '
+            '(received ${session.questionsSnapshot.length}).',
+      );
+      _logGameFailed('start', code: 'insufficient-questions');
+      return false;
+    }
+    return true;
+  }
+
+  bool _shouldFallbackToLocal(GameFunctionsException error) {
+    if (error.code == 'failed-precondition' || error.code == 'not-found') {
+      return true;
+    }
+    return error.code == 'unimplemented';
+  }
+
+  void _trackLocalSession(LocalSoloGameSession localSession) {
+    _localCorrectChoiceByQuestionId
+      ..clear()
+      ..addAll(localSession.correctChoiceByQuestionId);
+    _localSessionGameId = localSession.session.gameId;
+  }
+
+  void _clearLocalSession() {
+    _localCorrectChoiceByQuestionId.clear();
+    _localSessionGameId = null;
+  }
+
   Future<void> startGame(String categoryId) async {
     if (state.loading || _isStarting) return;
     final trimmedCategoryId = categoryId.trim();
@@ -240,11 +276,51 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
       }
       final gameFunctions = ref.read(gameFunctionsServiceProvider);
       final analytics = ref.read(analyticsServiceProvider);
-      final session = await gameFunctions.createGame(
-        topicId: trimmedCategoryId,
-        triviaPackId: packId,
-        mode: 'solo',
-      );
+      GameSession session;
+      try {
+        session = await gameFunctions.createGame(
+          topicId: trimmedCategoryId,
+          triviaPackId: packId,
+          mode: 'solo',
+        );
+        _clearLocalSession();
+        if (!_validateQuestionCount(session)) {
+          return;
+        }
+      } on GameFunctionsException catch (error) {
+        // Cloud Functions rejects missing/invalid packs; fall back to local packs
+        // so solo play can always start with verified content.
+        if (_shouldFallbackToLocal(error)) {
+          try {
+            final localSession = await ref
+                .read(localSoloGameServiceProvider)
+                .createSession(
+                  categoryId: trimmedCategoryId,
+                  packId: packId,
+                  seed: DateTime.now().millisecondsSinceEpoch,
+                );
+            session = localSession.session;
+            _trackLocalSession(localSession);
+            if (!_validateQuestionCount(session)) {
+              return;
+            }
+            analytics.logEvent('trivia_game_local_fallback', parameters: {
+              'topicId': trimmedCategoryId,
+              'packId': packId,
+              'mode': 'solo',
+            });
+          } catch (localError) {
+            _logGameFailed('start', code: 'local-fallback-failed');
+            state = state.copyWith(
+              loading: false,
+              error: 'Solo content error: ${_formatError(localError)}',
+            );
+            return;
+          }
+        } else {
+          rethrow;
+        }
+      }
       // Fairness requires server-generated question snapshots so clients cannot reshuffle or peek at answers.
       if (_completedGameIds.contains(session.gameId)) {
         state = state.copyWith(
@@ -310,6 +386,10 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
       final gameFunctions = ref.read(gameFunctionsServiceProvider);
       final analytics = ref.read(analyticsServiceProvider);
       final session = await gameFunctions.loadGame(gameId);
+      _clearLocalSession();
+      if (!_validateQuestionCount(session)) {
+        return;
+      }
       if (_completedGameIds.contains(session.gameId)) {
         state = state.copyWith(
           loading: false,
@@ -446,6 +526,35 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
           choice: question.choices[boundedIndex],
         );
       }).toList();
+      if (_localSessionGameId == session.gameId &&
+          _localCorrectChoiceByQuestionId.isNotEmpty) {
+        final total = session.questionsSnapshot.length;
+        final correct = answers.where((answer) {
+          return _localCorrectChoiceByQuestionId[answer.questionId] ==
+              answer.choice;
+        }).length;
+        const pointsPerCorrect = 100;
+        final score = correct * pointsPerCorrect;
+        final maxScore = total * pointsPerCorrect;
+        _completedGameIds.add(session.gameId);
+        state = state.copyWith(
+          points: score,
+          correctAnswers: correct,
+          isSubmitting: false,
+          isLocked: true,
+        );
+        ref.read(analyticsServiceProvider).logEvent(
+          'trivia_game_completed',
+          parameters: {
+            'gameId': session.gameId,
+            'score': score,
+            'maxScore': maxScore,
+            'total': total,
+            'local': true,
+          },
+        );
+        return (score: score, maxScore: maxScore, correct: correct, total: total);
+      }
       final result = await ref.read(gameFunctionsServiceProvider).completeGame(
             session.gameId,
             answers,
@@ -496,6 +605,7 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
 
   void reset() {
     _selectedIndexByQuestionId.clear();
+    _clearLocalSession();
     state = TriviaGameState.initial();
   }
 }
