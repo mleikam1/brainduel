@@ -17,12 +17,15 @@ class StartupGate extends ConsumerStatefulWidget {
   ConsumerState<StartupGate> createState() => _StartupGateState();
 }
 
+final bootstrapUserProvider = FutureProvider.autoDispose.family<void, User>(
+  (ref, user) async {
+    await ref.read(guestAuthServiceProvider).bootstrapUser(user);
+  },
+);
+
 class _StartupGateState extends ConsumerState<StartupGate> {
   StreamSubscription<User?>? _authSubscription;
   User? _currentUser;
-  String? _bootstrappedUid;
-  Future<void>? _bootstrapFuture;
-  Object? _bootstrapError;
 
   @override
   void initState() {
@@ -43,11 +46,6 @@ class _StartupGateState extends ConsumerState<StartupGate> {
     }
     setState(() {
       _currentUser = user;
-      if (user == null) {
-        _bootstrappedUid = null;
-        _bootstrapFuture = null;
-        _bootstrapError = null;
-      }
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
@@ -58,24 +56,8 @@ class _StartupGateState extends ConsumerState<StartupGate> {
         ref.read(userBootstrapReadyProvider.notifier).state = false;
         return;
       }
-      if (_bootstrappedUid == user.uid) {
-        return;
-      }
-      _bootstrappedUid = user.uid;
-      ref.read(userBootstrapReadyProvider.notifier).state = false;
-      _bootstrapError = null;
-      _bootstrapFuture = ref.read(guestAuthServiceProvider).bootstrapUser(user);
       ref.read(authUserIdProvider.notifier).state = user.uid;
-      _bootstrapFuture!.catchError((error) {
-        if (!mounted) {
-          return;
-        }
-        setState(() {
-          _bootstrapError = error;
-        });
-        ref.read(userBootstrapReadyProvider.notifier).state = false;
-      });
-      setState(() {});
+      ref.read(userBootstrapReadyProvider.notifier).state = false;
     });
   }
 
@@ -85,24 +67,19 @@ class _StartupGateState extends ConsumerState<StartupGate> {
     if (user == null) {
       return const GuestEntryPage();
     }
-    if (_bootstrapError != null) {
-      return const _StartupError();
-    }
-    final bootstrapFuture = _bootstrapFuture;
-    if (bootstrapFuture == null) {
-      return const _StartupLoading();
-    }
-    return FutureBuilder<void>(
-      future: bootstrapFuture,
-      builder: (context, bootstrapSnapshot) {
-        if (bootstrapSnapshot.connectionState == ConnectionState.waiting) {
-          return const _StartupLoading();
-        }
-        if (bootstrapSnapshot.hasError) {
-          ref.read(userBootstrapReadyProvider.notifier).state = false;
-          return const _StartupError();
-        }
+    // IMPORTANT: Provider mutations must not occur during build.
+    ref.listen<AsyncValue<void>>(bootstrapUserProvider(user), (previous, next) {
+      if (next is AsyncData<void>) {
         ref.read(userBootstrapReadyProvider.notifier).state = true;
+      } else if (next is AsyncError<void>) {
+        ref.read(userBootstrapReadyProvider.notifier).state = false;
+      }
+    });
+    final bootstrapState = ref.watch(bootstrapUserProvider(user));
+    return bootstrapState.when(
+      loading: () => const _StartupLoading(),
+      error: (_, __) => const _StartupError(),
+      data: (_) {
         final profileService = ref.watch(userProfileServiceProvider);
         return StreamBuilder<bool?>(
           stream: profileService.watchTopicsSelected(user.uid),
