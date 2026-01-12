@@ -1,0 +1,1120 @@
+{
+  "topics": [
+    {
+      "id": "geography",
+      "displayName": "Geography",
+      "questions": [
+        {
+          "prompt": "What is the capital city of France?",
+          "choices": ["Paris", "Lyon", "Marseille", "Nice"],
+          "correctIndex": 0,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "Which is the largest ocean on Earth?",
+          "choices": ["Atlantic Ocean", "Indian Ocean", "Pacific Ocean", "Arctic Ocean"],
+          "correctIndex": 2,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "Which continent is Brazil located in?",
+          "choices": ["Europe", "Asia", "South America", "Africa"],
+          "correctIndex": 2,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "Mount Everest lies on the border of Nepal and which country?",
+          "choices": ["India", "China", "Bhutan", "Myanmar"],
+          "correctIndex": 1,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "The Sahara Desert is primarily in which continent?",
+          "choices": ["Asia", "Africa", "Australia", "South America"],
+          "correctIndex": 1,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "Which country is also a continent?",
+          "choices": ["Greenland", "Australia", "Iceland", "Madagascar"],
+          "correctIndex": 1,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "What is the capital city of Japan?",
+          "choices": ["Osaka", "Kyoto", "Tokyo", "Nagoya"],
+          "correctIndex": 2,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "Which U.S. state is nicknamed the Sunshine State?",
+          "choices": ["California", "Florida", "Arizona", "Texas"],
+          "correctIndex": 1,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "Which country has the city of Cairo as its capital?",
+          "choices": ["Egypt", "Morocco", "Algeria", "Tunisia"],
+          "correctIndex": 0,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "What is the capital city of Canada?",
+          "choices": ["Toronto", "Vancouver", "Ottawa", "Montreal"],
+          "correctIndex": 2,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "Which river flows through Vienna, Bratislava, and Budapest?",
+          "choices": ["Rhine", "Danube", "Elbe", "Seine"],
+          "correctIndex": 1,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "Which African country has the largest population?",
+          "choices": ["Kenya", "Nigeria", "Egypt", "South Africa"],
+          "correctIndex": 1,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "The Andes mountain range is primarily located on which continent?",
+          "choices": ["North America", "Europe", "South America", "Antarctica"],
+          "correctIndex": 2,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "Which sea separates Europe and Africa?",
+          "choices": ["Baltic Sea", "Mediterranean Sea", "Black Sea", "Red Sea"],
+          "correctIndex": 1,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "What is the smallest country in the world by area?",
+          "choices": ["Monaco", "San Marino", "Vatican City", "Liechtenstein"],
+          "correctIndex": 2,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "Marrakech is a major city in which country?",
+          "choices": ["Morocco", "Jordan", "Tunisia", "Spain"],
+          "correctIndex": 0,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "Which mountain range is traditionally considered the boundary between Europe and Asia in Russia?",
+          "choices": ["Alps", "Ural Mountains", "Carpathians", "Caucasus"],
+          "correctIndex": 1,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "Which U.S. state has the most active volcanoes?",
+          "choices": ["Hawaii", "California", "Alaska", "Washington"],
+          "correctIndex": 2,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "The Great Barrier Reef is located off the coast of which country?",
+          "choices": ["Australia", "Indonesia", "Philippines", "Mexico"],
+          "correctIndex": 0,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "Which Asian country was formerly known as Siam?",
+          "choices": ["Myanmar", "Thailand", "Cambodia", "Laos"],
+          "correctIndex": 1,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "What is the capital city of Kazakhstan?",
+          "choices": ["Almaty", "Astana", "Tashkent", "Bishkek"],
+          "correctIndex": 1,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "Which strait separates Asia from North America?",
+          "choices": ["Gibraltar Strait", "Bering Strait", "Malacca Strait", "Dardanelles"],
+          "correctIndex": 1,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "Which country has the longest coastline in the world?",
+          "choices": ["Russia", "Canada", "Australia", "Indonesia"],
+          "correctIndex": 1,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "What is the highest waterfall in the world?",
+          "choices": ["Niagara Falls", "Victoria Falls", "Angel Falls", "Iguazu Falls"],
+          "correctIndex": 2,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "Lake Titicaca borders Peru and which other country?",
+          "choices": ["Chile", "Bolivia", "Ecuador", "Argentina"],
+          "correctIndex": 1,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "Which country is the only one that borders both the Caspian Sea and the Persian Gulf?",
+          "choices": ["Iraq", "Azerbaijan", "Iran", "Turkmenistan"],
+          "correctIndex": 2,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "What is the largest island in the world (excluding continents)?",
+          "choices": ["Greenland", "New Guinea", "Borneo", "Madagascar"],
+          "correctIndex": 0,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "The Kalahari Desert spans parts of Botswana and which other country?",
+          "choices": ["Namibia", "Sudan", "Somalia", "Ethiopia"],
+          "correctIndex": 0,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "What is the legislative capital of Sri Lanka?",
+          "choices": ["Colombo", "Galle", "Kandy", "Sri Jayawardenepura Kotte"],
+          "correctIndex": 3,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "Which river runs through Baghdad?",
+          "choices": ["Euphrates", "Jordan", "Tigris", "Orontes"],
+          "correctIndex": 2,
+          "difficulty": "hard"
+        }
+      ]
+    },
+    {
+      "id": "movies",
+      "displayName": "Movies",
+      "questions": [
+        {
+          "prompt": "Who directed the movie 'Jaws'?",
+          "choices": ["Steven Spielberg", "George Lucas", "James Cameron", "Ridley Scott"],
+          "correctIndex": 0,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "Which movie features the character Darth Vader?",
+          "choices": ["Star Wars", "Star Trek", "Dune", "Guardians of the Galaxy"],
+          "correctIndex": 0,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "In 'The Wizard of Oz', what color are Dorothy's slippers?",
+          "choices": ["Silver", "Ruby", "Blue", "Gold"],
+          "correctIndex": 1,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "Which film features the line 'Here's looking at you, kid'?",
+          "choices": ["Casablanca", "Gone with the Wind", "Citizen Kane", "The Maltese Falcon"],
+          "correctIndex": 0,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "Who played Jack Dawson in 'Titanic'?",
+          "choices": ["Brad Pitt", "Leonardo DiCaprio", "Matt Damon", "Johnny Depp"],
+          "correctIndex": 1,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "Which animated movie features the character Simba?",
+          "choices": ["The Lion King", "Finding Nemo", "Toy Story", "Shrek"],
+          "correctIndex": 0,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "Which movie is set in a dinosaur theme park on Isla Nublar?",
+          "choices": ["Jurassic Park", "King Kong", "The Lost World", "Godzilla"],
+          "correctIndex": 0,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "Which superhero is known as the Dark Knight?",
+          "choices": ["Batman", "Superman", "Spider-Man", "Iron Man"],
+          "correctIndex": 0,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "Which film series follows a young wizard named Harry Potter?",
+          "choices": ["Harry Potter", "The Chronicles of Narnia", "Percy Jackson", "The Golden Compass"],
+          "correctIndex": 0,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "In the movie 'Frozen', what is the name of the snowman?",
+          "choices": ["Sven", "Olaf", "Kristoff", "Hans"],
+          "correctIndex": 1,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "Which 1999 film features the character Neo?",
+          "choices": ["The Matrix", "Fight Club", "The Sixth Sense", "American Beauty"],
+          "correctIndex": 0,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "Which movie won the first Academy Award for Best Picture?",
+          "choices": ["Wings", "Sunrise", "The Jazz Singer", "All Quiet on the Western Front"],
+          "correctIndex": 0,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "Who directed 'Pulp Fiction'?",
+          "choices": ["Quentin Tarantino", "Martin Scorsese", "David Fincher", "Paul Thomas Anderson"],
+          "correctIndex": 0,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "Which film popularized the quote 'May the Force be with you'?",
+          "choices": ["Star Wars", "The Empire Strikes Back", "Return of the Jedi", "Rogue One"],
+          "correctIndex": 0,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "Which studio produced the film 'Spirited Away'?",
+          "choices": ["Studio Ghibli", "Pixar", "DreamWorks", "Laika"],
+          "correctIndex": 0,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "Who played Michael Corleone in 'The Godfather'?",
+          "choices": ["Al Pacino", "Robert De Niro", "Marlon Brando", "James Caan"],
+          "correctIndex": 0,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "Which movie is set on the planet Pandora?",
+          "choices": ["Avatar", "Interstellar", "Gravity", "Prometheus"],
+          "correctIndex": 0,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "What is the name of the hobbit played by Elijah Wood in 'The Lord of the Rings'?",
+          "choices": ["Bilbo Baggins", "Samwise Gamgee", "Frodo Baggins", "Meriadoc Brandybuck"],
+          "correctIndex": 2,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "Which movie features a toy cowboy named Woody?",
+          "choices": ["Toy Story", "Cars", "Monsters, Inc.", "Inside Out"],
+          "correctIndex": 0,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "Which film features the line 'I'll be back'?",
+          "choices": ["The Terminator", "Predator", "Robocop", "Total Recall"],
+          "correctIndex": 0,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "Which film won the Academy Award for Best Picture at the 2020 Oscars?",
+          "choices": ["1917", "Parasite", "Joker", "Once Upon a Time in Hollywood"],
+          "correctIndex": 1,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "Who directed 'Pan's Labyrinth'?",
+          "choices": ["Guillermo del Toro", "Alfonso Cuarón", "Alejandro González Iñárritu", "Pedro Almodóvar"],
+          "correctIndex": 0,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "Which film launched the Marvel Cinematic Universe in 2008?",
+          "choices": ["Iron Man", "The Incredible Hulk", "Spider-Man", "Captain America: The First Avenger"],
+          "correctIndex": 0,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "Which 2015 film reintroduced Star Wars with characters Rey and Finn?",
+          "choices": ["The Force Awakens", "The Last Jedi", "Rogue One", "Solo"],
+          "correctIndex": 0,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "Which movie features the mysterious word 'Rosebud'?",
+          "choices": ["Citizen Kane", "Casablanca", "Sunset Boulevard", "North by Northwest"],
+          "correctIndex": 0,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "Who directed '2001: A Space Odyssey'?",
+          "choices": ["Stanley Kubrick", "Ridley Scott", "George Lucas", "Christopher Nolan"],
+          "correctIndex": 0,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "Which film won Best Picture at the 1998 Oscars (for 1997 films)?",
+          "choices": ["Titanic", "L.A. Confidential", "The Full Monty", "Good Will Hunting"],
+          "correctIndex": 0,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "Who played Anton Chigurh in 'No Country for Old Men'?",
+          "choices": ["Javier Bardem", "Josh Brolin", "Tommy Lee Jones", "Benicio del Toro"],
+          "correctIndex": 0,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "Which film is the highest-grossing movie of all time (not adjusted for inflation)?",
+          "choices": ["Avatar", "Avengers: Endgame", "Titanic", "Star Wars: The Force Awakens"],
+          "correctIndex": 0,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "Which 1927 film is the first feature-length movie with synchronized dialogue?",
+          "choices": ["The Jazz Singer", "Metropolis", "The General", "Sunrise"],
+          "correctIndex": 0,
+          "difficulty": "hard"
+        }
+      ]
+    },
+    {
+      "id": "music",
+      "displayName": "Music",
+      "questions": [
+        {
+          "prompt": "How many strings does a standard guitar have?",
+          "choices": ["4", "5", "6", "7"],
+          "correctIndex": 2,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "Who is known as the 'King of Pop'?",
+          "choices": ["Elvis Presley", "Michael Jackson", "Prince", "Justin Timberlake"],
+          "correctIndex": 1,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "Which instrument has keys, pedals, and strings and is played sitting down?",
+          "choices": ["Piano", "Violin", "Clarinet", "Trumpet"],
+          "correctIndex": 0,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "Which genre is strongly associated with New Orleans and improvisation?",
+          "choices": ["Jazz", "Classical", "Country", "Reggae"],
+          "correctIndex": 0,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "Which band sang the song 'Hey Jude'?",
+          "choices": ["The Beatles", "The Rolling Stones", "The Who", "The Kinks"],
+          "correctIndex": 0,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "Which singer released the song 'Rolling in the Deep'?",
+          "choices": ["Adele", "Beyoncé", "Rihanna", "Sia"],
+          "correctIndex": 0,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "Which musical symbol indicates silence?",
+          "choices": ["Rest", "Clef", "Sharp", "Fermata"],
+          "correctIndex": 0,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "Which brass instrument is played using a slide?",
+          "choices": ["Trumpet", "Trombone", "French horn", "Tuba"],
+          "correctIndex": 1,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "Which artist sang the hit song 'Firework'?",
+          "choices": ["Katy Perry", "Taylor Swift", "Lady Gaga", "Pink"],
+          "correctIndex": 0,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "What is the highest female singing voice type?",
+          "choices": ["Alto", "Mezzo-soprano", "Soprano", "Contralto"],
+          "correctIndex": 2,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "Who composed 'The Four Seasons'?",
+          "choices": ["Johann Sebastian Bach", "Antonio Vivaldi", "Ludwig van Beethoven", "Wolfgang Amadeus Mozart"],
+          "correctIndex": 1,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "What is the musical term for the speed of a piece?",
+          "choices": ["Tempo", "Timbre", "Pitch", "Dynamics"],
+          "correctIndex": 0,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "Which band released the album 'The Dark Side of the Moon'?",
+          "choices": ["Pink Floyd", "Led Zeppelin", "The Beatles", "Queen"],
+          "correctIndex": 0,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "Which genre of music originated in Jamaica in the late 1960s?",
+          "choices": ["Reggae", "Salsa", "Disco", "Flamenco"],
+          "correctIndex": 0,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "Which singer is known for the song 'Like a Prayer'?",
+          "choices": ["Madonna", "Cyndi Lauper", "Whitney Houston", "Janet Jackson"],
+          "correctIndex": 0,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "What is the name of a scale with five notes per octave?",
+          "choices": ["Chromatic", "Pentatonic", "Diatonic", "Whole-tone"],
+          "correctIndex": 1,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "The flute belongs to which instrument family?",
+          "choices": ["Brass", "Woodwind", "String", "Percussion"],
+          "correctIndex": 1,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "Who composed 'Eine kleine Nachtmusik'?",
+          "choices": ["Mozart", "Beethoven", "Haydn", "Chopin"],
+          "correctIndex": 0,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "What is the national anthem of the United States called?",
+          "choices": ["America the Beautiful", "The Star-Spangled Banner", "My Country, 'Tis of Thee", "God Bless America"],
+          "correctIndex": 1,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "Which 1991 Nirvana album features 'Smells Like Teen Spirit'?",
+          "choices": ["Nevermind", "In Utero", "Bleach", "Incesticide"],
+          "correctIndex": 0,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "Who composed the opera 'Carmen'?",
+          "choices": ["Georges Bizet", "Giuseppe Verdi", "Giacomo Puccini", "Richard Wagner"],
+          "correctIndex": 0,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "What is the term for changing from one key to another in music?",
+          "choices": ["Modulation", "Syncopation", "Accent", "Ostinato"],
+          "correctIndex": 0,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "Which jazz trumpeter led the album 'Kind of Blue'?",
+          "choices": ["Miles Davis", "Louis Armstrong", "Dizzy Gillespie", "Chet Baker"],
+          "correctIndex": 0,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "Which band released the album 'OK Computer'?",
+          "choices": ["Radiohead", "Oasis", "Blur", "The Smashing Pumpkins"],
+          "correctIndex": 0,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "What is the time signature most commonly used for a waltz?",
+          "choices": ["2/4", "3/4", "4/4", "6/8"],
+          "correctIndex": 1,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "Which classical composer became deaf later in life?",
+          "choices": ["Beethoven", "Mozart", "Bach", "Handel"],
+          "correctIndex": 0,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "Who won the first season of American Idol?",
+          "choices": ["Kelly Clarkson", "Carrie Underwood", "Fantasia Barrino", "Jordin Sparks"],
+          "correctIndex": 0,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "Which instrument is a staple for lead melodies in bluegrass music?",
+          "choices": ["Mandolin", "Oboe", "Harpsichord", "Sitar"],
+          "correctIndex": 0,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "Who composed the orchestral piece 'Boléro'?",
+          "choices": ["Maurice Ravel", "Claude Debussy", "Igor Stravinsky", "Camille Saint-Saëns"],
+          "correctIndex": 0,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "Which rapper released the album 'The Marshall Mathers LP'?",
+          "choices": ["Eminem", "Jay-Z", "Nas", "Kanye West"],
+          "correctIndex": 0,
+          "difficulty": "hard"
+        }
+      ]
+    },
+    {
+      "id": "entertainment",
+      "displayName": "Entertainment",
+      "questions": [
+        {
+          "prompt": "What is the name of the coffee shop in the TV show 'Friends'?",
+          "choices": ["Central Perk", "Monk's Café", "The Max", "Cafe Nervosa"],
+          "correctIndex": 0,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "Which TV series features the character Walter White?",
+          "choices": ["Breaking Bad", "The Wire", "Better Call Saul", "Dexter"],
+          "correctIndex": 0,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "What is the name of the wizarding school in 'Harry Potter'?",
+          "choices": ["Hogwarts", "Durmstrang", "Beauxbatons", "Ilvermorny"],
+          "correctIndex": 0,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "Which streaming service is known for the series 'Stranger Things'?",
+          "choices": ["Netflix", "Hulu", "Amazon Prime Video", "Max"],
+          "correctIndex": 0,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "Who created 'The Simpsons'?",
+          "choices": ["Matt Groening", "Seth MacFarlane", "Trey Parker", "Mike Judge"],
+          "correctIndex": 0,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "What is the name of Mickey Mouse's dog?",
+          "choices": ["Pluto", "Goofy", "Donald", "Daisy"],
+          "correctIndex": 0,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "Which video game series features a plumber named Mario?",
+          "choices": ["Super Mario", "Sonic the Hedgehog", "Crash Bandicoot", "Mega Man"],
+          "correctIndex": 0,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "Which award honors excellence in television in the United States?",
+          "choices": ["Emmy Award", "Grammy Award", "Tony Award", "Academy Award"],
+          "correctIndex": 0,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "Which Disney movie features the character Elsa?",
+          "choices": ["Frozen", "Moana", "Tangled", "Brave"],
+          "correctIndex": 0,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "What is the name of the Marvel superhero team that includes Iron Man and Captain America?",
+          "choices": ["Avengers", "X-Men", "Fantastic Four", "Guardians of the Galaxy"],
+          "correctIndex": 0,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "Which TV series is set in the fictional land of Westeros?",
+          "choices": ["Game of Thrones", "The Witcher", "Vikings", "The Last Kingdom"],
+          "correctIndex": 0,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "What is the name of the main character in The Legend of Zelda series?",
+          "choices": ["Link", "Zelda", "Ganon", "Sheik"],
+          "correctIndex": 0,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "Which sitcom is set at the Dunder Mifflin paper company?",
+          "choices": ["The Office", "Parks and Recreation", "30 Rock", "Community"],
+          "correctIndex": 0,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "What is the name of the starship in 'Star Trek: The Original Series'?",
+          "choices": ["USS Enterprise", "USS Voyager", "USS Defiant", "USS Discovery"],
+          "correctIndex": 0,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "Which award honors excellence in Broadway theater?",
+          "choices": ["Tony Award", "Emmy Award", "Golden Globe", "BAFTA"],
+          "correctIndex": 0,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "Which play features the characters Rosencrantz and Guildenstern?",
+          "choices": ["Hamlet", "Macbeth", "Othello", "King Lear"],
+          "correctIndex": 0,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "Which TV show follows detectives in the 99th precinct of the NYPD?",
+          "choices": ["Brooklyn Nine-Nine", "Law & Order", "CSI: Miami", "Blue Bloods"],
+          "correctIndex": 0,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "Which company publishes The Legend of Zelda video games?",
+          "choices": ["Nintendo", "Sony", "Microsoft", "Sega"],
+          "correctIndex": 0,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "Who voices Homer Simpson?",
+          "choices": ["Dan Castellaneta", "Hank Azaria", "Seth MacFarlane", "John DiMaggio"],
+          "correctIndex": 0,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "Which adventure franchise features the character Lara Croft?",
+          "choices": ["Tomb Raider", "Uncharted", "Resident Evil", "Assassin's Creed"],
+          "correctIndex": 0,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "Which anime film won the 2003 Academy Award for Best Animated Feature?",
+          "choices": ["Spirited Away", "Akira", "My Neighbor Totoro", "Ghost in the Shell"],
+          "correctIndex": 0,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "Who wrote the play 'A Streetcar Named Desire'?",
+          "choices": ["Tennessee Williams", "Arthur Miller", "Eugene O'Neill", "Edward Albee"],
+          "correctIndex": 0,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "Which network originally aired 'The Sopranos'?",
+          "choices": ["HBO", "AMC", "FX", "CBS"],
+          "correctIndex": 0,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "Which Atari game is often cited as a major factor in the 1983 video game crash?",
+          "choices": ["E.T. the Extra-Terrestrial", "Pac-Man", "Space Invaders", "Asteroids"],
+          "correctIndex": 0,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "Which actor played the Tenth Doctor in 'Doctor Who'?",
+          "choices": ["David Tennant", "Matt Smith", "Christopher Eccleston", "Peter Capaldi"],
+          "correctIndex": 0,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "Which musical features the songs 'Defying Gravity' and 'Popular'?",
+          "choices": ["Wicked", "Rent", "Chicago", "Hamilton"],
+          "correctIndex": 0,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "Which studio produced the animated film 'My Neighbor Totoro'?",
+          "choices": ["Studio Ghibli", "Pixar", "DreamWorks", "Cartoon Saloon"],
+          "correctIndex": 0,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "Which TV series features advertising executive Don Draper?",
+          "choices": ["Mad Men", "Suits", "The Americans", "Succession"],
+          "correctIndex": 0,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "Which TV series featured the 'Who shot J.R.?' mystery?",
+          "choices": ["Dallas", "Dynasty", "Knots Landing", "Falcon Crest"],
+          "correctIndex": 0,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "Which video game franchise takes place in the region of Kanto?",
+          "choices": ["Pokémon", "Final Fantasy", "The Elder Scrolls", "Halo"],
+          "correctIndex": 0,
+          "difficulty": "hard"
+        }
+      ]
+    },
+    {
+      "id": "food",
+      "displayName": "Food",
+      "questions": [
+        {
+          "prompt": "Which fruit is typically used to make guacamole?",
+          "choices": ["Avocado", "Tomato", "Mango", "Lime"],
+          "correctIndex": 0,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "Which grain is the main ingredient in traditional risotto?",
+          "choices": ["Barley", "Rice", "Quinoa", "Oats"],
+          "correctIndex": 1,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "Which country is famous for pizza?",
+          "choices": ["Italy", "Spain", "Greece", "Turkey"],
+          "correctIndex": 0,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "Which dairy product is made by churning cream?",
+          "choices": ["Butter", "Yogurt", "Cheese", "Milk"],
+          "correctIndex": 0,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "Which herb is traditionally used to make pesto?",
+          "choices": ["Basil", "Parsley", "Cilantro", "Mint"],
+          "correctIndex": 0,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "What is the main ingredient in hummus?",
+          "choices": ["Chickpeas", "Lentils", "Black beans", "Peas"],
+          "correctIndex": 0,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "Which drink is made from fermented grapes?",
+          "choices": ["Wine", "Cider", "Beer", "Kombucha"],
+          "correctIndex": 0,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "Sushi is a cuisine that originated in which country?",
+          "choices": ["Japan", "China", "Thailand", "Vietnam"],
+          "correctIndex": 0,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "Which spice is made from dried flower stigmas and is known for its bright yellow color?",
+          "choices": ["Saffron", "Cumin", "Paprika", "Coriander"],
+          "correctIndex": 0,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "What is the main ingredient in a traditional omelet?",
+          "choices": ["Eggs", "Potatoes", "Bread", "Rice"],
+          "correctIndex": 0,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "Which country is known for the dish paella?",
+          "choices": ["Spain", "Italy", "Portugal", "France"],
+          "correctIndex": 0,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "Which type of pasta is shaped like small rice grains?",
+          "choices": ["Orzo", "Fusilli", "Penne", "Rigatoni"],
+          "correctIndex": 0,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "Which cheese is traditionally used on a Margherita pizza?",
+          "choices": ["Mozzarella", "Cheddar", "Gouda", "Parmesan"],
+          "correctIndex": 0,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "What is tofu primarily made from?",
+          "choices": ["Soybeans", "Chickpeas", "Rice", "Almonds"],
+          "correctIndex": 0,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "Which herb is a key ingredient in a classic French bouquet garni?",
+          "choices": ["Thyme", "Sage", "Tarragon", "Dill"],
+          "correctIndex": 0,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "Which country is credited with inventing the croissant?",
+          "choices": ["France", "Austria", "Switzerland", "Belgium"],
+          "correctIndex": 1,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "What is the main ingredient in miso?",
+          "choices": ["Fermented soybeans", "Fermented rice", "Seaweed", "Sesame"],
+          "correctIndex": 0,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "Which chili pepper is commonly smoked and dried to make chipotle?",
+          "choices": ["Jalapeño", "Habanero", "Serrano", "Poblano"],
+          "correctIndex": 0,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "Which country is the origin of the dish kimchi?",
+          "choices": ["South Korea", "China", "Japan", "Mongolia"],
+          "correctIndex": 0,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "Which nut is used to make marzipan?",
+          "choices": ["Almond", "Walnut", "Pistachio", "Hazelnut"],
+          "correctIndex": 0,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "Which Spanish cured ham is protected by a designation of origin and made from black Iberian pigs?",
+          "choices": ["Jamón ibérico", "Prosciutto", "Serrano ham", "Speck"],
+          "correctIndex": 0,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "What is the primary ingredient in the French sauce béarnaise?",
+          "choices": ["Butter", "Tomatoes", "Cream", "Olive oil"],
+          "correctIndex": 0,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "Which region of Italy is Parmigiano-Reggiano traditionally produced in?",
+          "choices": ["Emilia-Romagna", "Tuscany", "Sicily", "Liguria"],
+          "correctIndex": 0,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "Which Japanese noodle is made from buckwheat flour?",
+          "choices": ["Soba", "Udon", "Ramen", "Somen"],
+          "correctIndex": 0,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "What is the French term for a stew of meat cooked in wine, often beef?",
+          "choices": ["Boeuf bourguignon", "Coq au vin", "Cassoulet", "Pot-au-feu"],
+          "correctIndex": 0,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "Which country is the origin of the dish ceviche?",
+          "choices": ["Peru", "Mexico", "Chile", "Ecuador"],
+          "correctIndex": 0,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "What is the main ingredient in the Middle Eastern dish baba ganoush?",
+          "choices": ["Eggplant", "Lentils", "Chickpeas", "Zucchini"],
+          "correctIndex": 0,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "Which Italian dessert is made with mascarpone, coffee, and ladyfingers?",
+          "choices": ["Tiramisu", "Panna cotta", "Cannoli", "Gelato"],
+          "correctIndex": 0,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "What is the primary ingredient in gnocchi?",
+          "choices": ["Potatoes", "Corn", "Rice", "Polenta"],
+          "correctIndex": 0,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "Which spice blend commonly includes cinnamon, cloves, and nutmeg and is used in Middle Eastern cuisine?",
+          "choices": ["Baharat", "Herbes de Provence", "Garam masala", "Za'atar"],
+          "correctIndex": 0,
+          "difficulty": "hard"
+        }
+      ]
+    },
+    {
+      "id": "animals",
+      "displayName": "Animals",
+      "questions": [
+        {
+          "prompt": "Which animal is known as the largest land mammal?",
+          "choices": ["Elephant", "Giraffe", "Hippopotamus", "Rhinoceros"],
+          "correctIndex": 0,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "What do you call a baby cat?",
+          "choices": ["Pup", "Cub", "Kitten", "Foal"],
+          "correctIndex": 2,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "Which bird is famous for its ability to mimic human speech?",
+          "choices": ["Parrot", "Eagle", "Penguin", "Owl"],
+          "correctIndex": 0,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "Which animal is the fastest land mammal?",
+          "choices": ["Cheetah", "Lion", "Horse", "Gazelle"],
+          "correctIndex": 0,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "Which animal is known for changing its color to blend with surroundings?",
+          "choices": ["Chameleon", "Iguana", "Gecko", "Salamander"],
+          "correctIndex": 0,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "What do pandas mainly eat?",
+          "choices": ["Bamboo", "Fish", "Insects", "Fruit"],
+          "correctIndex": 0,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "Which animal is known for its black-and-white stripes?",
+          "choices": ["Zebra", "Skunk", "Badger", "Okapi"],
+          "correctIndex": 0,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "Which sea creature has eight arms?",
+          "choices": ["Octopus", "Squid", "Crab", "Starfish"],
+          "correctIndex": 0,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "What is the largest species of shark?",
+          "choices": ["Great white shark", "Whale shark", "Tiger shark", "Hammerhead shark"],
+          "correctIndex": 1,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "Which animal is known for building dams?",
+          "choices": ["Beaver", "Otter", "Badger", "Marmot"],
+          "correctIndex": 0,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "Which mammal is capable of sustained flight?",
+          "choices": ["Bat", "Flying squirrel", "Sugar glider", "Lemur"],
+          "correctIndex": 0,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "What is the largest species of penguin?",
+          "choices": ["Emperor penguin", "King penguin", "Adélie penguin", "Gentoo penguin"],
+          "correctIndex": 0,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "Which animal has the longest lifespan among land animals?",
+          "choices": ["Galápagos tortoise", "Elephant", "Giraffe", "Polar bear"],
+          "correctIndex": 0,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "What is the term for a group of lions?",
+          "choices": ["Pride", "Herd", "Pack", "Flock"],
+          "correctIndex": 0,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "Which bird is the largest in the world by height?",
+          "choices": ["Ostrich", "Emu", "Cassowary", "Rhea"],
+          "correctIndex": 0,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "Which animal is known for having a pouch to carry its young?",
+          "choices": ["Kangaroo", "Armadillo", "Sloth", "Otter"],
+          "correctIndex": 0,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "What is the primary diet of a koala?",
+          "choices": ["Eucalyptus leaves", "Bamboo", "Fruit", "Insects"],
+          "correctIndex": 0,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "Which reptile is known for having a rattle on its tail?",
+          "choices": ["Rattlesnake", "Gila monster", "Iguana", "Monitor lizard"],
+          "correctIndex": 0,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "Which animal is known as the ship of the desert?",
+          "choices": ["Camel", "Llama", "Donkey", "Yak"],
+          "correctIndex": 0,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "What is the only continent where giraffes are found in the wild?",
+          "choices": ["Africa", "Asia", "South America", "Australia"],
+          "correctIndex": 0,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "Which animal has a heart located in its head?",
+          "choices": ["Shrimp", "Octopus", "Squid", "Crab"],
+          "correctIndex": 0,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "What is the largest species of bear?",
+          "choices": ["Polar bear", "Grizzly bear", "Sun bear", "American black bear"],
+          "correctIndex": 0,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "Which animal is known for having the highest blood pressure?",
+          "choices": ["Giraffe", "Elephant", "Rhinoceros", "Moose"],
+          "correctIndex": 0,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "Which marine mammal is the largest animal on Earth?",
+          "choices": ["Blue whale", "Orca", "Humpback whale", "Sperm whale"],
+          "correctIndex": 0,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "What is the term for an animal that eats both plants and animals?",
+          "choices": ["Omnivore", "Carnivore", "Herbivore", "Detritivore"],
+          "correctIndex": 0,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "Which snake is the longest species in the world?",
+          "choices": ["Reticulated python", "Green anaconda", "King cobra", "Boa constrictor"],
+          "correctIndex": 0,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "Which animal is known to have fingerprints so similar to humans they can confuse forensic analysis?",
+          "choices": ["Koala", "Raccoon", "Chimpanzee", "Otter"],
+          "correctIndex": 0,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "What is the only venomous primate?",
+          "choices": ["Slow loris", "Tarsier", "Aye-aye", "Marmoset"],
+          "correctIndex": 0,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "Which bird can fly backward?",
+          "choices": ["Hummingbird", "Swallow", "Swift", "Albatross"],
+          "correctIndex": 0,
+          "difficulty": "hard"
+        },
+        {
+          "prompt": "Which animal has the longest gestation period?",
+          "choices": ["African elephant", "Blue whale", "Giraffe", "Hippopotamus"],
+          "correctIndex": 0,
+          "difficulty": "hard"
+        }
+      ]
+    }
+  ]
+}
