@@ -52,13 +52,6 @@ class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> with Ticker
       vsync: this,
       duration: const Duration(seconds: _answerSeconds),
     );
-    ref.listen(triviaSessionProvider, (previous, next) {
-      final wasShowing = previous?.showAlreadyCompletedModal ?? false;
-      if (next.showAlreadyCompletedModal && !wasShowing) {
-        _showAlreadyCompletedDialog();
-        ref.read(triviaSessionProvider.notifier).dismissAlreadyCompletedModal();
-      }
-    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _resolveLaunchArgs();
@@ -206,6 +199,13 @@ class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> with Ticker
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(triviaSessionProvider, (previous, next) {
+      final wasShowing = previous?.showAlreadyCompletedModal ?? false;
+      if (next.showAlreadyCompletedModal && !wasShowing) {
+        _showAlreadyCompletedDialog();
+        ref.read(triviaSessionProvider.notifier).dismissAlreadyCompletedModal();
+      }
+    });
     final state = ref.watch(triviaSessionProvider);
     final points = state.points;
     final isAnswerPhase = state.phase == QuestionPhase.answering;
