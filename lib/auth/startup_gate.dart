@@ -55,12 +55,14 @@ class _StartupGateState extends ConsumerState<StartupGate> {
       }
       if (user == null) {
         ref.read(authUserIdProvider.notifier).state = null;
+        ref.read(userBootstrapReadyProvider.notifier).state = false;
         return;
       }
       if (_bootstrappedUid == user.uid) {
         return;
       }
       _bootstrappedUid = user.uid;
+      ref.read(userBootstrapReadyProvider.notifier).state = false;
       _bootstrapError = null;
       _bootstrapFuture = ref.read(guestAuthServiceProvider).bootstrapUser(user);
       ref.read(authUserIdProvider.notifier).state = user.uid;
@@ -71,6 +73,7 @@ class _StartupGateState extends ConsumerState<StartupGate> {
         setState(() {
           _bootstrapError = error;
         });
+        ref.read(userBootstrapReadyProvider.notifier).state = false;
       });
       setState(() {});
     });
@@ -96,8 +99,10 @@ class _StartupGateState extends ConsumerState<StartupGate> {
           return const _StartupLoading();
         }
         if (bootstrapSnapshot.hasError) {
+          ref.read(userBootstrapReadyProvider.notifier).state = false;
           return const _StartupError();
         }
+        ref.read(userBootstrapReadyProvider.notifier).state = true;
         final profileService = ref.watch(userProfileServiceProvider);
         return StreamBuilder<bool?>(
           stream: profileService.watchTopicsSelected(user.uid),

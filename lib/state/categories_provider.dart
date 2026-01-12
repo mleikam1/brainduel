@@ -14,7 +14,17 @@ final contentCacheServiceProvider = Provider<ContentCacheService>((ref) {
   return ContentCacheService();
 });
 
-final categoriesProvider = FutureProvider<List<Category>>((ref) async {
+class CategoriesManifest {
+  CategoriesManifest({
+    required this.categories,
+    required this.packMap,
+  });
+
+  final List<Category> categories;
+  final Map<String, String> packMap;
+}
+
+final categoriesManifestProvider = FutureProvider<CategoriesManifest>((ref) async {
   final storage = ref.read(storageContentServiceProvider);
   final cache = ref.read(contentCacheServiceProvider);
 
@@ -26,18 +36,22 @@ final categoriesProvider = FutureProvider<List<Category>>((ref) async {
 
   final decoded = json.decode(jsonText) as Map<String, dynamic>;
   final list = (decoded['categories'] as List).cast<Map<String, dynamic>>();
-  return list.map(Category.fromJson).where((c) => c.enabled).toList();
+  final categories = list.map(Category.fromJson).toList();
+  final rawPackMap = decoded['packMap'];
+  final packMap = rawPackMap is Map<String, dynamic>
+      ? rawPackMap.map((key, value) => MapEntry(key, value.toString()))
+      : <String, String>{};
+  return CategoriesManifest(categories: categories, packMap: packMap);
 });
 
-final categoryPackPathProvider = Provider.family<String, String>((ref, categoryId) {
-  // Derived from the demo manifest in StorageContentService.
-  // When you move to Firebase, this mapping will come from manifest JSON.
-  const mapping = {
-    'sports': 'pack_sports',
-    'history': 'pack_history',
-    'science': 'pack_science',
-  };
-  return mapping[categoryId] ?? 'pack_sports';
+final categoriesProvider = FutureProvider<List<Category>>((ref) async {
+  final manifest = await ref.watch(categoriesManifestProvider.future);
+  return manifest.categories.where((c) => c.enabled).toList();
+});
+
+final categoryPackIdProvider = FutureProvider.family<String, String>((ref, categoryId) async {
+  final manifest = await ref.watch(categoriesManifestProvider.future);
+  return manifest.packMap[categoryId] ?? '';
 });
 
 final categoryDetailProvider = Provider.family<CategoryDetail, Category>((ref, category) {
