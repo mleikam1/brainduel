@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../app.dart';
+import '../state/auth_provider.dart';
+import '../state/categories_provider.dart';
 import '../state/trivia_session_provider.dart';
 import '../state/user_stats_provider.dart';
 import '../state/subscription_provider.dart';
@@ -52,19 +54,6 @@ class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> with Ticker
       vsync: this,
       duration: const Duration(seconds: _answerSeconds),
     );
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _resolveLaunchArgs();
-      final launchArgs = _launchArgs;
-      if (launchArgs == null || _started) return;
-      final notifier = ref.read(triviaSessionProvider.notifier);
-      if (launchArgs.isShared) {
-        notifier.loadGame(launchArgs.gameId!);
-      } else if (launchArgs.categoryId != null) {
-        notifier.startGame(launchArgs.categoryId!);
-      }
-      _started = true;
-    });
     _sessionSubscription = ref.listenManual(triviaSessionProvider, (previous, next) {
       if (next.session != null &&
           (previous?.session == null || previous?.currentIndex != next.currentIndex)) {
@@ -206,6 +195,26 @@ class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> with Ticker
         ref.read(triviaSessionProvider.notifier).dismissAlreadyCompletedModal();
       }
     });
+    _resolveLaunchArgs();
+    final launchArgs = _launchArgs;
+    final userReady = ref.watch(userBootstrapReadyProvider);
+    final categoriesReady =
+        ref.watch(categoriesProvider).maybeWhen(data: (_) => true, orElse: () => false);
+    if (!_started && launchArgs != null && userReady) {
+      final shouldStart = launchArgs.isShared || categoriesReady;
+      if (shouldStart) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted || _started) return;
+          final notifier = ref.read(triviaSessionProvider.notifier);
+          if (launchArgs.isShared) {
+            notifier.loadGame(launchArgs.gameId!);
+          } else if (launchArgs.categoryId != null) {
+            notifier.startGame(launchArgs.categoryId!);
+          }
+          _started = true;
+        });
+      }
+    }
     final state = ref.watch(triviaSessionProvider);
     final points = state.points;
     final isAnswerPhase = state.phase == QuestionPhase.answering;

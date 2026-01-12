@@ -36,6 +36,7 @@ class GuestAuthController extends StateNotifier<GuestAuthState> {
     }
     await _authService.bootstrapUser(user);
     _ref.read(authUserIdProvider.notifier).state = user.uid;
+    _ref.read(userBootstrapReadyProvider.notifier).state = true;
     return true;
   }
 
@@ -44,6 +45,7 @@ class GuestAuthController extends StateNotifier<GuestAuthState> {
     try {
       final user = await _authService.signInAnonymously();
       _ref.read(authUserIdProvider.notifier).state = user.uid;
+      _ref.read(userBootstrapReadyProvider.notifier).state = true;
       state = state.copyWith(isLoading: false, errorMessage: null);
       return true;
     } catch (_) {

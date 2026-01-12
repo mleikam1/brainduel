@@ -139,12 +139,25 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
       case 'unauthenticated':
         return 'Please sign in to continue.';
       case 'failed-precondition':
-        return 'This game is not available right now.';
+        final details = _formatFunctionsDetails(error);
+        if (details.contains('user') && details.contains('document')) {
+          return 'Your account is still getting set up. Please try again shortly.';
+        }
+        if (details.contains('pack') || details.contains('topic') || details.contains('category')) {
+          return 'This game is not available right now.';
+        }
+        return 'This game is not ready yet. Please try again in a moment.';
       case 'not-found':
         return 'That game could not be found.';
       default:
         return error.message ?? 'Something went wrong. Please try again.';
     }
+  }
+
+  String _formatFunctionsDetails(GameFunctionsException error) {
+    final message = (error.message ?? '').toLowerCase();
+    final details = error.details?.toString().toLowerCase() ?? '';
+    return '$message $details'.trim();
   }
 
   bool _isAlreadyCompletedError(GameFunctionsException error) {
@@ -186,11 +199,21 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
     final trimmedCategoryId = categoryId.trim();
     if (trimmedCategoryId.isEmpty) {
       state = state.copyWith(error: 'Please choose a category to continue.');
+      _logGameFailed('start', code: 'missing-category');
       return;
     }
     final userId = ref.read(authUserIdProvider);
     if (userId == null || userId.isEmpty) {
       state = state.copyWith(error: 'Please sign in to continue.');
+      _logGameFailed('start', code: 'unauthenticated');
+      return;
+    }
+    final userReady = ref.read(userBootstrapReadyProvider);
+    if (!userReady) {
+      state = state.copyWith(
+        error: 'Your account is still getting set up. Please try again shortly.',
+      );
+      _logGameFailed('start', code: 'user-not-ready');
       return;
     }
     _isStarting = true;
@@ -203,13 +226,23 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
           loading: false,
           error: 'That category is not available right now.',
         );
+        _logGameFailed('start', code: 'category-unavailable');
         return;
       }
-      final topicId = ref.read(categoryPackPathProvider(trimmedCategoryId));
+      final packId = await ref.read(categoryPackIdProvider(trimmedCategoryId).future);
+      if (packId.trim().isEmpty) {
+        state = state.copyWith(
+          loading: false,
+          error: 'That trivia pack is not available right now.',
+        );
+        _logGameFailed('start', code: 'pack-unavailable');
+        return;
+      }
       final gameFunctions = ref.read(gameFunctionsServiceProvider);
       final analytics = ref.read(analyticsServiceProvider);
       final session = await gameFunctions.createGame(
-        topicId: topicId,
+        topicId: trimmedCategoryId,
+        triviaPackId: packId,
         mode: 'solo',
       );
       // Fairness requires server-generated question snapshots so clients cannot reshuffle or peek at answers.
@@ -224,7 +257,7 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
 
       analytics.logEvent('trivia_game_started', parameters: {
         'topicId': trimmedCategoryId,
-        'packId': topicId,
+        'packId': packId,
         'mode': 'solo',
         'gameId': session.gameId,
         'source': 'category',
@@ -258,6 +291,20 @@ class TriviaSessionNotifier extends StateNotifier<TriviaGameState> {
   }
 
   Future<void> loadGame(String gameId) async {
+    final userId = ref.read(authUserIdProvider);
+    if (userId == null || userId.isEmpty) {
+      state = state.copyWith(error: 'Please sign in to continue.');
+      _logGameFailed('load', code: 'unauthenticated');
+      return;
+    }
+    final userReady = ref.read(userBootstrapReadyProvider);
+    if (!userReady) {
+      state = state.copyWith(
+        error: 'Your account is still getting set up. Please try again shortly.',
+      );
+      _logGameFailed('load', code: 'user-not-ready');
+      return;
+    }
     state = state.copyWith(loading: true, error: null);
     try {
       final gameFunctions = ref.read(gameFunctionsServiceProvider);

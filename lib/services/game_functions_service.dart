@@ -15,12 +15,14 @@ class GameFunctionsService {
 
   Future<GameSession> createGame({
     required String topicId,
+    required String triviaPackId,
     required String mode,
   }) async {
     try {
       final callable = _functions.httpsCallable('createGame');
       final result = await callable.call({
         'topicId': topicId,
+        'triviaPackId': triviaPackId,
         'mode': mode,
       });
       final data = _requireMap(result.data, 'createGame');
