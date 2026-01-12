@@ -13,10 +13,16 @@ class GameFunctionsService {
 
   final FirebaseFunctions _functions;
 
-  Future<GameSession> createGame(String topicId) async {
+  Future<GameSession> createGame({
+    required String topicId,
+    required String mode,
+  }) async {
     try {
       final callable = _functions.httpsCallable('createGame');
-      final result = await callable.call({'topicId': topicId});
+      final result = await callable.call({
+        'topicId': topicId,
+        'mode': mode,
+      });
       final data = _requireMap(result.data, 'createGame');
       return GameSession.fromJson(data);
     } on FirebaseFunctionsException catch (error) {
