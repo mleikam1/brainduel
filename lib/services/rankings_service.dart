@@ -79,7 +79,7 @@ class RankingsService {
         scoreLine: '7–8',
         timeLabel: 'Yesterday',
       ),
-      const WinLossRecord(
+      WinLossRecord(
         opponent: 'Alex V.',
         win: true,
         modeLabel: 'Speed Round',
