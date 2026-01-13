@@ -46,6 +46,8 @@ class LocalSoloGameService {
     required String packId,
     int? seed,
   }) async {
+    // Trivia packs are resolved via the category manifest (categoryId -> packId)
+    // so questions stay aligned with the selected category.
     final jsonText = await cache.getCachedOrFetch(
       key: 'pack_$packId',
       version: 1,

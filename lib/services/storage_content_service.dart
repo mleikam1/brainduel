@@ -18,17 +18,32 @@ class StorageContentService {
   }
 
   static final Map<String, Object> _demoContent = {
+    // Category registry used by the client to render Home/Discover and map
+    // categoryId -> packId for local/demo sessions. Keep IDs in sync with
+    // backend topicId values (Firestore topics + questions).
     'categories': {
-      'version': 1,
+      'version': 2,
       'categories': [
         {'id': 'sports', 'title': 'Sports', 'icon': '🏈', 'enabled': true},
         {'id': 'history', 'title': 'History', 'icon': '🏛️', 'enabled': true},
         {'id': 'science', 'title': 'Science', 'icon': '🧪', 'enabled': true},
+        {'id': 'geography', 'title': 'Geography', 'icon': '🌍', 'enabled': true},
+        {'id': 'movies', 'title': 'Movies', 'icon': '🎬', 'enabled': true},
+        {'id': 'music', 'title': 'Music', 'icon': '🎵', 'enabled': true},
+        {'id': 'entertainment', 'title': 'Entertainment', 'icon': '🎭', 'enabled': true},
+        {'id': 'food', 'title': 'Food', 'icon': '🍔', 'enabled': true},
+        {'id': 'animals', 'title': 'Animals', 'icon': '🐾', 'enabled': true},
       ],
       'packMap': {
         'sports': 'pack_sports',
         'history': 'pack_history',
         'science': 'pack_science',
+        'geography': 'pack_geography',
+        'movies': 'pack_movies',
+        'music': 'pack_music',
+        'entertainment': 'pack_entertainment',
+        'food': 'pack_food',
+        'animals': 'pack_animals',
       }
     },
     'pack_sports': {
@@ -254,6 +269,703 @@ class StorageContentService {
             {'id': 'd', 'text': 'Trudgen'},
           ],
           'explanation': 'Butterfly is one of the four medley strokes.'
+        },
+      ]
+    },
+    'pack_geography': {
+      'categoryId': 'geography',
+      'version': 1,
+      'questions': [
+        {
+          'id': 'geography_q1',
+          'question': 'What is the capital city of France?',
+          'answers': [
+            {'id': 'a', 'text': 'Paris', 'correct': true},
+            {'id': 'b', 'text': 'Lyon'},
+            {'id': 'c', 'text': 'Marseille'},
+            {'id': 'd', 'text': 'Nice'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'geography_q2',
+          'question': 'Which is the largest ocean on Earth?',
+          'answers': [
+            {'id': 'a', 'text': 'Atlantic Ocean'},
+            {'id': 'b', 'text': 'Indian Ocean'},
+            {'id': 'c', 'text': 'Pacific Ocean', 'correct': true},
+            {'id': 'd', 'text': 'Arctic Ocean'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'geography_q3',
+          'question': 'Which continent is Brazil located in?',
+          'answers': [
+            {'id': 'a', 'text': 'Europe'},
+            {'id': 'b', 'text': 'Asia'},
+            {'id': 'c', 'text': 'South America', 'correct': true},
+            {'id': 'd', 'text': 'Africa'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'geography_q4',
+          'question': 'Mount Everest lies on the border of Nepal and which country?',
+          'answers': [
+            {'id': 'a', 'text': 'India'},
+            {'id': 'b', 'text': 'China', 'correct': true},
+            {'id': 'c', 'text': 'Bhutan'},
+            {'id': 'd', 'text': 'Myanmar'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'geography_q5',
+          'question': 'The Sahara Desert is primarily in which continent?',
+          'answers': [
+            {'id': 'a', 'text': 'Asia'},
+            {'id': 'b', 'text': 'Africa', 'correct': true},
+            {'id': 'c', 'text': 'Australia'},
+            {'id': 'd', 'text': 'South America'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'geography_q6',
+          'question': 'Which country is also a continent?',
+          'answers': [
+            {'id': 'a', 'text': 'Greenland'},
+            {'id': 'b', 'text': 'Australia', 'correct': true},
+            {'id': 'c', 'text': 'Iceland'},
+            {'id': 'd', 'text': 'Madagascar'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'geography_q7',
+          'question': 'What is the capital city of Japan?',
+          'answers': [
+            {'id': 'a', 'text': 'Osaka'},
+            {'id': 'b', 'text': 'Kyoto'},
+            {'id': 'c', 'text': 'Tokyo', 'correct': true},
+            {'id': 'd', 'text': 'Nagoya'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'geography_q8',
+          'question': 'Which U.S. state is nicknamed the Sunshine State?',
+          'answers': [
+            {'id': 'a', 'text': 'California'},
+            {'id': 'b', 'text': 'Florida', 'correct': true},
+            {'id': 'c', 'text': 'Arizona'},
+            {'id': 'd', 'text': 'Texas'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'geography_q9',
+          'question': 'Which country has the city of Cairo as its capital?',
+          'answers': [
+            {'id': 'a', 'text': 'Egypt', 'correct': true},
+            {'id': 'b', 'text': 'Morocco'},
+            {'id': 'c', 'text': 'Algeria'},
+            {'id': 'd', 'text': 'Tunisia'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'geography_q10',
+          'question': 'What is the capital city of Canada?',
+          'answers': [
+            {'id': 'a', 'text': 'Toronto'},
+            {'id': 'b', 'text': 'Vancouver'},
+            {'id': 'c', 'text': 'Ottawa', 'correct': true},
+            {'id': 'd', 'text': 'Montreal'},
+          ],
+          'explanation': ''
+        },
+      ]
+    },
+    'pack_movies': {
+      'categoryId': 'movies',
+      'version': 1,
+      'questions': [
+        {
+          'id': 'movies_q1',
+          'question': "Who directed the movie 'Jaws'?",
+          'answers': [
+            {'id': 'a', 'text': 'Steven Spielberg', 'correct': true},
+            {'id': 'b', 'text': 'George Lucas'},
+            {'id': 'c', 'text': 'James Cameron'},
+            {'id': 'd', 'text': 'Ridley Scott'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'movies_q2',
+          'question': 'Which movie features the character Darth Vader?',
+          'answers': [
+            {'id': 'a', 'text': 'Star Wars', 'correct': true},
+            {'id': 'b', 'text': 'Star Trek'},
+            {'id': 'c', 'text': 'Dune'},
+            {'id': 'd', 'text': 'Guardians of the Galaxy'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'movies_q3',
+          'question': "In 'The Wizard of Oz', what color are Dorothy's slippers?",
+          'answers': [
+            {'id': 'a', 'text': 'Silver'},
+            {'id': 'b', 'text': 'Ruby', 'correct': true},
+            {'id': 'c', 'text': 'Blue'},
+            {'id': 'd', 'text': 'Gold'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'movies_q4',
+          'question': "Which film features the line 'Here's looking at you, kid'?",
+          'answers': [
+            {'id': 'a', 'text': 'Casablanca', 'correct': true},
+            {'id': 'b', 'text': 'Gone with the Wind'},
+            {'id': 'c', 'text': 'Citizen Kane'},
+            {'id': 'd', 'text': 'The Maltese Falcon'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'movies_q5',
+          'question': "Who played Jack Dawson in 'Titanic'?",
+          'answers': [
+            {'id': 'a', 'text': 'Brad Pitt'},
+            {'id': 'b', 'text': 'Leonardo DiCaprio', 'correct': true},
+            {'id': 'c', 'text': 'Matt Damon'},
+            {'id': 'd', 'text': 'Johnny Depp'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'movies_q6',
+          'question': 'Which animated movie features the character Simba?',
+          'answers': [
+            {'id': 'a', 'text': 'The Lion King', 'correct': true},
+            {'id': 'b', 'text': 'Finding Nemo'},
+            {'id': 'c', 'text': 'Toy Story'},
+            {'id': 'd', 'text': 'Shrek'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'movies_q7',
+          'question': 'Which movie is set in a dinosaur theme park on Isla Nublar?',
+          'answers': [
+            {'id': 'a', 'text': 'Jurassic Park', 'correct': true},
+            {'id': 'b', 'text': 'King Kong'},
+            {'id': 'c', 'text': 'The Lost World'},
+            {'id': 'd', 'text': 'Godzilla'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'movies_q8',
+          'question': 'Which superhero is known as the Dark Knight?',
+          'answers': [
+            {'id': 'a', 'text': 'Batman', 'correct': true},
+            {'id': 'b', 'text': 'Superman'},
+            {'id': 'c', 'text': 'Spider-Man'},
+            {'id': 'd', 'text': 'Iron Man'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'movies_q9',
+          'question': 'Which film series follows a young wizard named Harry Potter?',
+          'answers': [
+            {'id': 'a', 'text': 'Harry Potter', 'correct': true},
+            {'id': 'b', 'text': 'The Chronicles of Narnia'},
+            {'id': 'c', 'text': 'Percy Jackson'},
+            {'id': 'd', 'text': 'The Golden Compass'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'movies_q10',
+          'question': "In the movie 'Frozen', what is the name of the snowman?",
+          'answers': [
+            {'id': 'a', 'text': 'Sven'},
+            {'id': 'b', 'text': 'Olaf', 'correct': true},
+            {'id': 'c', 'text': 'Kristoff'},
+            {'id': 'd', 'text': 'Hans'},
+          ],
+          'explanation': ''
+        },
+      ]
+    },
+    'pack_music': {
+      'categoryId': 'music',
+      'version': 1,
+      'questions': [
+        {
+          'id': 'music_q1',
+          'question': 'How many strings does a standard guitar have?',
+          'answers': [
+            {'id': 'a', 'text': '4'},
+            {'id': 'b', 'text': '5'},
+            {'id': 'c', 'text': '6', 'correct': true},
+            {'id': 'd', 'text': '7'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'music_q2',
+          'question': "Who is known as the 'King of Pop'?",
+          'answers': [
+            {'id': 'a', 'text': 'Elvis Presley'},
+            {'id': 'b', 'text': 'Michael Jackson', 'correct': true},
+            {'id': 'c', 'text': 'Prince'},
+            {'id': 'd', 'text': 'Justin Timberlake'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'music_q3',
+          'question': 'Which instrument has keys, pedals, and strings and is played sitting down?',
+          'answers': [
+            {'id': 'a', 'text': 'Piano', 'correct': true},
+            {'id': 'b', 'text': 'Violin'},
+            {'id': 'c', 'text': 'Clarinet'},
+            {'id': 'd', 'text': 'Trumpet'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'music_q4',
+          'question': 'Which genre is strongly associated with New Orleans and improvisation?',
+          'answers': [
+            {'id': 'a', 'text': 'Jazz', 'correct': true},
+            {'id': 'b', 'text': 'Classical'},
+            {'id': 'c', 'text': 'Country'},
+            {'id': 'd', 'text': 'Reggae'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'music_q5',
+          'question': "Which band sang the song 'Hey Jude'?",
+          'answers': [
+            {'id': 'a', 'text': 'The Beatles', 'correct': true},
+            {'id': 'b', 'text': 'The Rolling Stones'},
+            {'id': 'c', 'text': 'The Who'},
+            {'id': 'd', 'text': 'The Kinks'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'music_q6',
+          'question': "Which singer released the song 'Rolling in the Deep'?",
+          'answers': [
+            {'id': 'a', 'text': 'Adele', 'correct': true},
+            {'id': 'b', 'text': 'Beyoncé'},
+            {'id': 'c', 'text': 'Rihanna'},
+            {'id': 'd', 'text': 'Sia'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'music_q7',
+          'question': 'Which musical symbol indicates silence?',
+          'answers': [
+            {'id': 'a', 'text': 'Rest', 'correct': true},
+            {'id': 'b', 'text': 'Clef'},
+            {'id': 'c', 'text': 'Sharp'},
+            {'id': 'd', 'text': 'Fermata'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'music_q8',
+          'question': 'Which brass instrument is played using a slide?',
+          'answers': [
+            {'id': 'a', 'text': 'Trumpet'},
+            {'id': 'b', 'text': 'Trombone', 'correct': true},
+            {'id': 'c', 'text': 'French horn'},
+            {'id': 'd', 'text': 'Tuba'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'music_q9',
+          'question': "Which artist sang the hit song 'Firework'?",
+          'answers': [
+            {'id': 'a', 'text': 'Katy Perry', 'correct': true},
+            {'id': 'b', 'text': 'Taylor Swift'},
+            {'id': 'c', 'text': 'Lady Gaga'},
+            {'id': 'd', 'text': 'Pink'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'music_q10',
+          'question': 'What is the highest female singing voice type?',
+          'answers': [
+            {'id': 'a', 'text': 'Alto'},
+            {'id': 'b', 'text': 'Mezzo-soprano'},
+            {'id': 'c', 'text': 'Soprano', 'correct': true},
+            {'id': 'd', 'text': 'Contralto'},
+          ],
+          'explanation': ''
+        },
+      ]
+    },
+    'pack_entertainment': {
+      'categoryId': 'entertainment',
+      'version': 1,
+      'questions': [
+        {
+          'id': 'entertainment_q1',
+          'question': "What is the name of the coffee shop in the TV show 'Friends'?",
+          'answers': [
+            {'id': 'a', 'text': 'Central Perk', 'correct': true},
+            {'id': 'b', 'text': "Monk's Café"},
+            {'id': 'c', 'text': 'The Max'},
+            {'id': 'd', 'text': 'Cafe Nervosa'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'entertainment_q2',
+          'question': 'Which TV series features the character Walter White?',
+          'answers': [
+            {'id': 'a', 'text': 'Breaking Bad', 'correct': true},
+            {'id': 'b', 'text': 'The Wire'},
+            {'id': 'c', 'text': 'Better Call Saul'},
+            {'id': 'd', 'text': 'Dexter'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'entertainment_q3',
+          'question': "What is the name of the wizarding school in 'Harry Potter'?",
+          'answers': [
+            {'id': 'a', 'text': 'Hogwarts', 'correct': true},
+            {'id': 'b', 'text': 'Durmstrang'},
+            {'id': 'c', 'text': 'Beauxbatons'},
+            {'id': 'd', 'text': 'Ilvermorny'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'entertainment_q4',
+          'question': "Which streaming service is known for the series 'Stranger Things'?",
+          'answers': [
+            {'id': 'a', 'text': 'Netflix', 'correct': true},
+            {'id': 'b', 'text': 'Hulu'},
+            {'id': 'c', 'text': 'Amazon Prime Video'},
+            {'id': 'd', 'text': 'Max'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'entertainment_q5',
+          'question': "Who created 'The Simpsons'?",
+          'answers': [
+            {'id': 'a', 'text': 'Matt Groening', 'correct': true},
+            {'id': 'b', 'text': 'Seth MacFarlane'},
+            {'id': 'c', 'text': 'Trey Parker'},
+            {'id': 'd', 'text': 'Mike Judge'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'entertainment_q6',
+          'question': "What is the name of Mickey Mouse's dog?",
+          'answers': [
+            {'id': 'a', 'text': 'Pluto', 'correct': true},
+            {'id': 'b', 'text': 'Goofy'},
+            {'id': 'c', 'text': 'Donald'},
+            {'id': 'd', 'text': 'Daisy'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'entertainment_q7',
+          'question': 'Which video game series features a plumber named Mario?',
+          'answers': [
+            {'id': 'a', 'text': 'Super Mario', 'correct': true},
+            {'id': 'b', 'text': 'Sonic the Hedgehog'},
+            {'id': 'c', 'text': 'Crash Bandicoot'},
+            {'id': 'd', 'text': 'Mega Man'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'entertainment_q8',
+          'question': 'Which award honors excellence in television in the United States?',
+          'answers': [
+            {'id': 'a', 'text': 'Emmy Award', 'correct': true},
+            {'id': 'b', 'text': 'Grammy Award'},
+            {'id': 'c', 'text': 'Tony Award'},
+            {'id': 'd', 'text': 'Academy Award'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'entertainment_q9',
+          'question': 'Which Disney movie features the character Elsa?',
+          'answers': [
+            {'id': 'a', 'text': 'Frozen', 'correct': true},
+            {'id': 'b', 'text': 'Moana'},
+            {'id': 'c', 'text': 'Tangled'},
+            {'id': 'd', 'text': 'Brave'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'entertainment_q10',
+          'question':
+              'What is the name of the Marvel superhero team that includes Iron Man and Captain America?',
+          'answers': [
+            {'id': 'a', 'text': 'Avengers', 'correct': true},
+            {'id': 'b', 'text': 'X-Men'},
+            {'id': 'c', 'text': 'Fantastic Four'},
+            {'id': 'd', 'text': 'Guardians of the Galaxy'},
+          ],
+          'explanation': ''
+        },
+      ]
+    },
+    'pack_food': {
+      'categoryId': 'food',
+      'version': 1,
+      'questions': [
+        {
+          'id': 'food_q1',
+          'question': 'What is the main ingredient in guacamole?',
+          'answers': [
+            {'id': 'a', 'text': 'Avocado', 'correct': true},
+            {'id': 'b', 'text': 'Tomato'},
+            {'id': 'c', 'text': 'Cucumber'},
+            {'id': 'd', 'text': 'Zucchini'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'food_q2',
+          'question': 'Sushi originated in which country?',
+          'answers': [
+            {'id': 'a', 'text': 'China'},
+            {'id': 'b', 'text': 'Japan', 'correct': true},
+            {'id': 'c', 'text': 'Thailand'},
+            {'id': 'd', 'text': 'Vietnam'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'food_q3',
+          'question': 'Which cuisine is most associated with pasta?',
+          'answers': [
+            {'id': 'a', 'text': 'Italian', 'correct': true},
+            {'id': 'b', 'text': 'Greek'},
+            {'id': 'c', 'text': 'French'},
+            {'id': 'd', 'text': 'Mexican'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'food_q4',
+          'question': 'Which spice is made from dried flower buds?',
+          'answers': [
+            {'id': 'a', 'text': 'Cumin'},
+            {'id': 'b', 'text': 'Clove', 'correct': true},
+            {'id': 'c', 'text': 'Paprika'},
+            {'id': 'd', 'text': 'Turmeric'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'food_q5',
+          'question': 'Which grain is most commonly used to make bread?',
+          'answers': [
+            {'id': 'a', 'text': 'Wheat', 'correct': true},
+            {'id': 'b', 'text': 'Rice'},
+            {'id': 'c', 'text': 'Corn'},
+            {'id': 'd', 'text': 'Quinoa'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'food_q6',
+          'question': 'Tofu is primarily made from which ingredient?',
+          'answers': [
+            {'id': 'a', 'text': 'Soybeans', 'correct': true},
+            {'id': 'b', 'text': 'Chickpeas'},
+            {'id': 'c', 'text': 'Lentils'},
+            {'id': 'd', 'text': 'Peanuts'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'food_q7',
+          'question': 'Which fruit includes the variety Granny Smith?',
+          'answers': [
+            {'id': 'a', 'text': 'Apple', 'correct': true},
+            {'id': 'b', 'text': 'Pear'},
+            {'id': 'c', 'text': 'Peach'},
+            {'id': 'd', 'text': 'Plum'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'food_q8',
+          'question': 'Paella is a traditional dish from which country?',
+          'answers': [
+            {'id': 'a', 'text': 'Spain', 'correct': true},
+            {'id': 'b', 'text': 'Portugal'},
+            {'id': 'c', 'text': 'Italy'},
+            {'id': 'd', 'text': 'Greece'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'food_q9',
+          'question': 'What is the name of the flatbread used for tacos?',
+          'answers': [
+            {'id': 'a', 'text': 'Tortilla', 'correct': true},
+            {'id': 'b', 'text': 'Naan'},
+            {'id': 'c', 'text': 'Pita'},
+            {'id': 'd', 'text': 'Lavash'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'food_q10',
+          'question': 'Which dairy product is made by curdling milk?',
+          'answers': [
+            {'id': 'a', 'text': 'Cheese', 'correct': true},
+            {'id': 'b', 'text': 'Butter'},
+            {'id': 'c', 'text': 'Ice cream'},
+            {'id': 'd', 'text': 'Yogurt'},
+          ],
+          'explanation': ''
+        },
+      ]
+    },
+    'pack_animals': {
+      'categoryId': 'animals',
+      'version': 1,
+      'questions': [
+        {
+          'id': 'animals_q1',
+          'question': 'Which animal is known as the largest land mammal?',
+          'answers': [
+            {'id': 'a', 'text': 'Elephant', 'correct': true},
+            {'id': 'b', 'text': 'Giraffe'},
+            {'id': 'c', 'text': 'Hippopotamus'},
+            {'id': 'd', 'text': 'Rhinoceros'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'animals_q2',
+          'question': 'What do you call a baby cat?',
+          'answers': [
+            {'id': 'a', 'text': 'Pup'},
+            {'id': 'b', 'text': 'Cub'},
+            {'id': 'c', 'text': 'Kitten', 'correct': true},
+            {'id': 'd', 'text': 'Foal'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'animals_q3',
+          'question': 'Which bird is famous for its ability to mimic human speech?',
+          'answers': [
+            {'id': 'a', 'text': 'Parrot', 'correct': true},
+            {'id': 'b', 'text': 'Eagle'},
+            {'id': 'c', 'text': 'Penguin'},
+            {'id': 'd', 'text': 'Owl'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'animals_q4',
+          'question': 'Which animal is the fastest land mammal?',
+          'answers': [
+            {'id': 'a', 'text': 'Cheetah', 'correct': true},
+            {'id': 'b', 'text': 'Lion'},
+            {'id': 'c', 'text': 'Horse'},
+            {'id': 'd', 'text': 'Gazelle'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'animals_q5',
+          'question': 'Which animal is known for changing its color to blend with surroundings?',
+          'answers': [
+            {'id': 'a', 'text': 'Chameleon', 'correct': true},
+            {'id': 'b', 'text': 'Iguana'},
+            {'id': 'c', 'text': 'Gecko'},
+            {'id': 'd', 'text': 'Salamander'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'animals_q6',
+          'question': 'What do pandas mainly eat?',
+          'answers': [
+            {'id': 'a', 'text': 'Bamboo', 'correct': true},
+            {'id': 'b', 'text': 'Fish'},
+            {'id': 'c', 'text': 'Insects'},
+            {'id': 'd', 'text': 'Fruit'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'animals_q7',
+          'question': 'Which animal is known for its black-and-white stripes?',
+          'answers': [
+            {'id': 'a', 'text': 'Zebra', 'correct': true},
+            {'id': 'b', 'text': 'Skunk'},
+            {'id': 'c', 'text': 'Badger'},
+            {'id': 'd', 'text': 'Okapi'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'animals_q8',
+          'question': 'Which sea creature has eight arms?',
+          'answers': [
+            {'id': 'a', 'text': 'Octopus', 'correct': true},
+            {'id': 'b', 'text': 'Squid'},
+            {'id': 'c', 'text': 'Crab'},
+            {'id': 'd', 'text': 'Starfish'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'animals_q9',
+          'question': 'What is the largest species of shark?',
+          'answers': [
+            {'id': 'a', 'text': 'Great white shark'},
+            {'id': 'b', 'text': 'Whale shark', 'correct': true},
+            {'id': 'c', 'text': 'Tiger shark'},
+            {'id': 'd', 'text': 'Hammerhead shark'},
+          ],
+          'explanation': ''
+        },
+        {
+          'id': 'animals_q10',
+          'question': 'Which animal is known for building dams?',
+          'answers': [
+            {'id': 'a', 'text': 'Beaver', 'correct': true},
+            {'id': 'b', 'text': 'Otter'},
+            {'id': 'c', 'text': 'Badger'},
+            {'id': 'd', 'text': 'Marmot'},
+          ],
+          'explanation': ''
         },
       ]
     },
