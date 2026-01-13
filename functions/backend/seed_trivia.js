@@ -54,6 +54,8 @@ function validateSeed(seed) {
   assert(seed && typeof seed === "object", "Seed file must be a JSON object");
   assert(Array.isArray(seed.topics), "Seed must contain topics[]");
 
+  // Seed topics are the category registry; normalized topicId must match
+  // frontend categoryId values to keep Home/Discover/Rankings aligned.
   seed.topics.forEach((t, idx) => {
     const topicId = normalizeTopicId(t.id);
     assert(topicId, `topics[${idx}].id is required`);
@@ -131,6 +133,8 @@ async function main() {
 
   const now = admin.firestore.FieldValue.serverTimestamp();
 
+  // Each topicId becomes the categoryId used when querying questions by topicId.
+  // Add new categories by appending topics in trivia_seed.json and re-running.
   for (const t of seed.topics) {
     const topicId = normalizeTopicId(t.id);
     const displayName = t.displayName.trim();

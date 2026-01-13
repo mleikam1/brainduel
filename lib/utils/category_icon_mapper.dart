@@ -12,8 +12,16 @@ class CategoryIconMapper {
         return Icons.science;
       case 'geography':
         return Icons.public;
+      case 'movies':
+        return Icons.movie;
+      case 'music':
+        return Icons.music_note;
       case 'entertainment':
         return Icons.movie;
+      case 'food':
+        return Icons.restaurant;
+      case 'animals':
+        return Icons.pets;
       case 'technology':
         return Icons.memory;
       case 'general':
@@ -25,6 +33,9 @@ class CategoryIconMapper {
         if (title.contains('science')) return Icons.science;
         if (title.contains('geo')) return Icons.public;
         if (title.contains('entertainment') || title.contains('movie')) return Icons.movie;
+        if (title.contains('music')) return Icons.music_note;
+        if (title.contains('food')) return Icons.restaurant;
+        if (title.contains('animal')) return Icons.pets;
         if (title.contains('tech')) return Icons.memory;
         if (title.contains('general')) return Icons.quiz;
         return Icons.quiz;

@@ -52,6 +52,8 @@ function validateSeed(seed) {
     die("Seed file must contain a top-level 'topics' array");
   }
 
+  // Seed topics define the category registry for backend ingestion.
+  // topic.id is normalized to topicId and must match frontend categoryId values.
   seed.topics.forEach((topic, tIndex) => {
     if (!topic.id || !topic.displayName) {
       die(`Topic at index ${tIndex} must have id and displayName`);
@@ -128,6 +130,9 @@ async function main() {
 
   const now = admin.firestore.FieldValue.serverTimestamp();
 
+  // Each topic maps to a categoryId; questions are queried by topicId.
+  // To add a new category, append a topic with questions to trivia_seed.json
+  // and rerun this seeder.
   for (const topic of seed.topics) {
     const topicId = normalizeTopicId(topic.id);
 

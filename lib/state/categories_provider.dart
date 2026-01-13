@@ -20,7 +20,10 @@ class CategoriesManifest {
     required this.packMap,
   });
 
+  // Category registry used across Home/Discover/Rankings.
+  // `id` values must match backend topicId values (Firestore topics/questions).
   final List<Category> categories;
+  // Maps categoryId -> packId for local/demo packs.
   final Map<String, String> packMap;
 }
 
@@ -28,9 +31,11 @@ final categoriesManifestProvider = FutureProvider<CategoriesManifest>((ref) asyn
   final storage = ref.read(storageContentServiceProvider);
   final cache = ref.read(contentCacheServiceProvider);
 
+  // Category definitions are delivered via a manifest so we can update the
+  // registry without hardcoding lists inside widgets.
   final jsonText = await cache.getCachedOrFetch(
     key: 'categories_manifest',
-    version: 1,
+    version: 2,
     fetcher: () => storage.downloadTextFile('categories'),
   );
 
@@ -55,6 +60,8 @@ final categoryPackIdProvider = FutureProvider.family<String, String>((ref, categ
 });
 
 final categoryDetailProvider = Provider.family<CategoryDetail, Category>((ref, category) {
+  // Hardcoded metadata for the demo experience; add new entries here when
+  // shipping new categories, or move to a remote manifest later.
   const details = {
     'sports': (
     subtitle: 'Elite competitions',
@@ -75,6 +82,48 @@ final categoryDetailProvider = Provider.family<CategoryDetail, Category>((ref, c
     description: 'Challenge your grasp of physics, chemistry, and the universe beyond.',
     questionCount: 20,
     points: 1300,
+    packCount: 2,
+    ),
+    'geography': (
+    subtitle: 'World knowledge',
+    description: 'Explore capitals, landmarks, and global geography in fast rounds.',
+    questionCount: 20,
+    points: 1350,
+    packCount: 2,
+    ),
+    'movies': (
+    subtitle: 'Cinematic moments',
+    description: 'From classics to blockbusters, test your movie trivia instincts.',
+    questionCount: 20,
+    points: 1350,
+    packCount: 2,
+    ),
+    'music': (
+    subtitle: 'Soundtrack savvy',
+    description: 'Hit the right notes across artists, genres, and iconic tracks.',
+    questionCount: 20,
+    points: 1300,
+    packCount: 2,
+    ),
+    'entertainment': (
+    subtitle: 'Pop culture pulse',
+    description: 'TV, streaming, games, and fan favorites across the entertainment world.',
+    questionCount: 20,
+    points: 1300,
+    packCount: 2,
+    ),
+    'food': (
+    subtitle: 'Flavor rounds',
+    description: 'From global dishes to kitchen staples, prove your foodie knowledge.',
+    questionCount: 20,
+    points: 1250,
+    packCount: 2,
+    ),
+    'animals': (
+    subtitle: 'Wild facts',
+    description: 'Celebrate wildlife, habitats, and animal kingdom surprises.',
+    questionCount: 20,
+    points: 1250,
     packCount: 2,
     ),
   };
