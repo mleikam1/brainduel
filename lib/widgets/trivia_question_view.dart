@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/game_session.dart';
-import '../state/trivia_session_provider.dart';
+import '../state/quiz_controller.dart';
 import 'bd_answer_option_tile.dart';
 import 'bd_card.dart';
 

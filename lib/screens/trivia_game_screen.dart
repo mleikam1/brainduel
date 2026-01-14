@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../app.dart';
 import '../state/auth_provider.dart';
 import '../state/categories_provider.dart';
-import '../state/trivia_session_provider.dart';
+import '../state/quiz_controller.dart';
 import '../state/user_stats_provider.dart';
 import '../state/subscription_provider.dart';
 import '../theme/brain_duel_theme.dart';
@@ -54,7 +54,7 @@ class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> with Ticker
       vsync: this,
       duration: const Duration(seconds: _answerSeconds),
     );
-    _sessionSubscription = ref.listenManual(triviaSessionProvider, (previous, next) {
+    _sessionSubscription = ref.listenManual(quizControllerProvider, (previous, next) {
       if (next.session != null &&
           (previous?.session == null || previous?.currentIndex != next.currentIndex)) {
         _startReadPhase();
@@ -104,7 +104,7 @@ class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> with Ticker
     _answerTimerController.value = 0;
     _readTimer = Timer(const Duration(seconds: _readSeconds), () {
       if (!mounted) return;
-      ref.read(triviaSessionProvider.notifier).startAnswerPhase();
+      ref.read(quizControllerProvider.notifier).startAnswerPhase();
       _startAnswerPhase();
     });
   }
@@ -113,7 +113,7 @@ class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> with Ticker
     _answerTimerController.forward(from: 0);
     _answerTimer = Timer(const Duration(seconds: _answerSeconds), () {
       if (!mounted) return;
-      ref.read(triviaSessionProvider.notifier).timeoutQuestion();
+      ref.read(quizControllerProvider.notifier).timeoutQuestion();
     });
   }
 
@@ -127,7 +127,7 @@ class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> with Ticker
     _advanceTimer?.cancel();
     _advanceTimer = Timer(const Duration(seconds: 1), () {
       if (!mounted) return;
-      final notifier = ref.read(triviaSessionProvider.notifier);
+      final notifier = ref.read(quizControllerProvider.notifier);
       if (notifier.isLastQuestion) {
         _finishGameAndGoToResults();
       } else {
@@ -137,11 +137,11 @@ class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> with Ticker
   }
 
   void _finishGameAndGoToResults() {
-    final notifier = ref.read(triviaSessionProvider.notifier);
+    final notifier = ref.read(quizControllerProvider.notifier);
     _cancelTimers();
     notifier.completeGame().then((result) {
       if (!mounted || result == null) return;
-      final state = ref.read(triviaSessionProvider);
+      final state = ref.read(quizControllerProvider);
       final session = state.session!;
       final total = result.total ?? session.questionsSnapshot.length;
       final correct = result.correct ?? state.correctAnswers;
@@ -188,11 +188,11 @@ class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> with Ticker
 
   @override
   Widget build(BuildContext context) {
-    ref.listen(triviaSessionProvider, (previous, next) {
+    ref.listen(quizControllerProvider, (previous, next) {
       final wasShowing = previous?.showAlreadyCompletedModal ?? false;
       if (next.showAlreadyCompletedModal && !wasShowing) {
         _showAlreadyCompletedDialog();
-        ref.read(triviaSessionProvider.notifier).dismissAlreadyCompletedModal();
+        ref.read(quizControllerProvider.notifier).dismissAlreadyCompletedModal();
       }
     });
     _resolveLaunchArgs();
@@ -205,7 +205,7 @@ class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> with Ticker
       if (shouldStart) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted || _started) return;
-          final notifier = ref.read(triviaSessionProvider.notifier);
+          final notifier = ref.read(quizControllerProvider.notifier);
           if (launchArgs.isShared) {
             notifier.loadGame(launchArgs.gameId!);
           } else if (launchArgs.categoryId != null) {
@@ -215,7 +215,7 @@ class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> with Ticker
         });
       }
     }
-    final state = ref.watch(triviaSessionProvider);
+    final state = ref.watch(quizControllerProvider);
     final points = state.points;
     final isAnswerPhase = state.phase == QuestionPhase.answering;
 
@@ -238,7 +238,7 @@ class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> with Ticker
                           onPressed: () {
                             final launchArgs = _launchArgs;
                             if (launchArgs == null) return;
-                            final notifier = ref.read(triviaSessionProvider.notifier);
+                            final notifier = ref.read(quizControllerProvider.notifier);
                             if (launchArgs.isShared) {
                               notifier.loadGame(launchArgs.gameId!);
                             } else if (launchArgs.categoryId != null) {
@@ -312,7 +312,7 @@ class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> with Ticker
                                         phase: state.phase,
                                         selectedIndex: state.selectedIndex,
                                         onSelectAnswer: (index) => ref
-                                            .read(triviaSessionProvider.notifier)
+                                            .read(quizControllerProvider.notifier)
                                             .selectAnswer(index),
                                       ),
                                     ),

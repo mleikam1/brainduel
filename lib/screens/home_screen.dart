@@ -6,7 +6,7 @@ import '../models/category.dart';
 import '../models/home_dashboard.dart';
 import '../state/home_dashboard_provider.dart';
 import '../state/home_feed_provider.dart';
-import '../state/trivia_session_provider.dart';
+import '../state/quiz_controller.dart';
 import '../theme/brain_duel_theme.dart';
 import '../widgets/app_scaffold.dart';
 import '../widgets/bd_buttons.dart';
@@ -29,9 +29,9 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final dashboardAsync = ref.watch(homeDashboardProvider);
     final seasonalAsync = ref.watch(homeFeedProvider);
-    final sessionState = ref.watch(triviaSessionProvider);
+    final sessionState = ref.watch(quizControllerProvider);
     final showResume = sessionState.session != null &&
-        !(sessionState.isAnswered && ref.read(triviaSessionProvider.notifier).isLastQuestion);
+        !(sessionState.isAnswered && ref.read(quizControllerProvider.notifier).isLastQuestion);
 
     return BDAppScaffold(
       title: 'Brain Duel',
@@ -312,8 +312,8 @@ class _PackRail extends StatelessWidget {
             child: CategoryCard(
               category: category,
               onTap: () => context.pushNamed(
-                TriviaApp.nameCategoryDetail,
-                extra: category.id,
+                TriviaApp.nameGame,
+                extra: {'categoryId': category.id},
               ),
             ),
           );
