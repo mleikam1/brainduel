@@ -70,5 +70,18 @@ service cloud.firestore {
         allow delete: if isOwner(uid);
       }
     }
+
+    /* =========================
+       Shared Quizzes
+       ========================= */
+
+    match /sharedQuizzes/{quizId} {
+
+      // Public read for deep links
+      allow read: if true;
+
+      // No client writes — backend/Admin SDK only
+      allow write: if false;
+    }
   }
 }

@@ -24,6 +24,30 @@ interface CategoryProgress {
   weekKey: string;
 }
 
+interface SharedQuizSnapshotQuestion {
+  questionId: string;
+  prompt: string;
+  choices: string[];
+  difficulty: string;
+}
+
+interface SharedQuizResponse {
+  quizId: string;
+  categoryId: string;
+  quizSize: number;
+  questionIds: string[];
+  createdBy: string;
+  createdAt: admin.firestore.Timestamp;
+  expiresAt: admin.firestore.Timestamp;
+  questionsSnapshot: SharedQuizSnapshotQuestion[];
+}
+
+const SHARED_QUIZ_TTL_DAYS = 14;
+const sharedQuizCache = new Map<
+  string,
+  { expiresAtMs: number; payload: SharedQuizResponse }
+>();
+
 /**
  * Utility: deterministic shuffle using seeded RNG
  */
@@ -61,6 +85,22 @@ function isoWeekKey(date: Date = new Date()): string {
       (target.getTime() - firstThursday.getTime()) / (7 * 24 * 3600 * 1000)
     );
   return `${target.getUTCFullYear()}-W${String(weekNo).padStart(2, "0")}`;
+}
+
+function nowTimestamp(): admin.firestore.Timestamp {
+  return admin.firestore.Timestamp.fromDate(new Date());
+}
+
+function normalizeQuestionSnapshot(
+  doc: FirebaseFirestore.DocumentSnapshot
+): SharedQuizSnapshotQuestion {
+  const data = doc.data() as QuestionDoc;
+  return {
+    questionId: doc.id,
+    prompt: data.prompt,
+    choices: data.choices,
+    difficulty: data.difficulty ?? "medium",
+  };
 }
 
 /**
@@ -213,6 +253,157 @@ export const createGame = onCall(async (request) => {
       weekKey,
     },
   };
+});
+
+/**
+ * Callable: createSharedQuiz
+ */
+export const createSharedQuiz = onCall(async (request) => {
+  const uid = request.auth?.uid;
+  const categoryId = request.data?.categoryId as string | undefined;
+  const questionIds = request.data?.questionIds as string[] | undefined;
+  const quizSize = request.data?.quizSize as number | undefined;
+
+  if (!uid) {
+    throw new HttpsError("unauthenticated", "User must be authenticated");
+  }
+  if (
+    !categoryId ||
+    !Array.isArray(questionIds) ||
+    questionIds.length === 0 ||
+    typeof quizSize !== "number"
+  ) {
+    throw new HttpsError(
+      "invalid-argument",
+      "categoryId, questionIds, and quizSize are required"
+    );
+  }
+
+  const uniqueIds = Array.from(new Set(questionIds));
+  if (uniqueIds.length !== questionIds.length) {
+    throw new HttpsError(
+      "invalid-argument",
+      "questionIds must be unique"
+    );
+  }
+  if (quizSize !== questionIds.length) {
+    throw new HttpsError(
+      "invalid-argument",
+      "quizSize must match questionIds length"
+    );
+  }
+
+  const questionRefs = questionIds.map((id) => db.doc(`questions/${id}`));
+  const questionDocs = await db.getAll(...questionRefs);
+
+  if (questionDocs.some((doc) => !doc.exists)) {
+    throw new HttpsError(
+      "failed-precondition",
+      "One or more questions not found"
+    );
+  }
+
+  questionDocs.forEach((doc) => {
+    const data = doc.data() as QuestionDoc;
+    if (!data.active || data.topicId !== categoryId) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Question set is invalid for this category"
+      );
+    }
+  });
+
+  const questionsSnapshot = questionDocs.map(normalizeQuestionSnapshot);
+  const quizId = db.collection("sharedQuizzes").doc().id;
+  const createdAt = nowTimestamp();
+  const expiresAt = admin.firestore.Timestamp.fromDate(
+    new Date(Date.now() + SHARED_QUIZ_TTL_DAYS * 24 * 60 * 60 * 1000)
+  );
+
+  const sharedQuizDoc = {
+    quizId,
+    categoryId,
+    quizSize,
+    questionIds,
+    createdBy: uid,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    expiresAt,
+    questionsSnapshot,
+  };
+
+  await db.doc(`sharedQuizzes/${quizId}`).set(sharedQuizDoc);
+
+  const response: SharedQuizResponse = {
+    quizId,
+    categoryId,
+    quizSize,
+    questionIds,
+    createdBy: uid,
+    createdAt,
+    expiresAt,
+    questionsSnapshot,
+  };
+
+  sharedQuizCache.set(quizId, {
+    expiresAtMs: expiresAt.toMillis(),
+    payload: response,
+  });
+
+  return response;
+});
+
+/**
+ * Callable: getSharedQuiz
+ */
+export const getSharedQuiz = onCall(async (request) => {
+  const quizId = request.data?.quizId as string | undefined;
+
+  if (!quizId) {
+    throw new HttpsError("invalid-argument", "quizId is required");
+  }
+
+  const cached = sharedQuizCache.get(quizId);
+  if (cached && cached.expiresAtMs > Date.now()) {
+    return cached.payload;
+  }
+
+  const sharedQuizSnap = await db.doc(`sharedQuizzes/${quizId}`).get();
+  if (!sharedQuizSnap.exists) {
+    throw new HttpsError("not-found", "Shared quiz not found");
+  }
+
+  const data = sharedQuizSnap.data() as SharedQuizResponse;
+  const expiresAt = data.expiresAt;
+  if (expiresAt.toMillis() <= Date.now()) {
+    throw new HttpsError("failed-precondition", "Shared quiz expired");
+  }
+
+  let questionsSnapshot = data.questionsSnapshot;
+  if (!Array.isArray(questionsSnapshot) || questionsSnapshot.length === 0) {
+    const questionRefs = data.questionIds.map((id) =>
+      db.doc(`questions/${id}`)
+    );
+    const questionDocs = await db.getAll(...questionRefs);
+    questionsSnapshot = questionDocs.map(normalizeQuestionSnapshot);
+  }
+
+  const response: SharedQuizResponse = {
+    quizId,
+    categoryId: data.categoryId,
+    quizSize: data.quizSize,
+    questionIds: data.questionIds,
+    createdBy: data.createdBy,
+    createdAt: data.createdAt,
+    expiresAt: data.expiresAt,
+    questionsSnapshot,
+  };
+
+  sharedQuizCache.set(quizId, {
+    expiresAtMs: expiresAt.toMillis(),
+    payload: response,
+  });
+
+  return response;
 });
 
 /**
