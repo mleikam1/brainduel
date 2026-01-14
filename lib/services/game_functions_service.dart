@@ -43,6 +43,17 @@ class GameFunctionsService {
     }
   }
 
+  Future<GameSession> getSharedQuiz(String quizId) async {
+    try {
+      final callable = _functions.httpsCallable('getSharedQuiz');
+      final result = await callable.call({'quizId': quizId});
+      final data = _requireMap(result.data, 'getSharedQuiz');
+      return GameSession.fromJson(data);
+    } on FirebaseFunctionsException catch (error) {
+      throw GameFunctionsException.fromFirebase(error);
+    }
+  }
+
   Future<({int score, int maxScore, int? correct, int? total})> completeGame(
     String gameId,
     List<GameAnswer> answers,

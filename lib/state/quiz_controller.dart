@@ -232,12 +232,12 @@ class QuizController extends StateNotifier<TriviaGameState> {
     );
   }
 
-  bool _validateQuestionCount(GameSession session) {
+  bool _validateQuestionCount(GameSession session, {String modeLabel = 'Solo matches'}) {
     if (session.questionsSnapshot.length < kMinimumSoloQuestionCount) {
       state = state.copyWith(
         loading: false,
         error:
-            'Solo matches need at least $kMinimumSoloQuestionCount questions '
+            '$modeLabel need at least $kMinimumSoloQuestionCount questions '
             '(received ${session.questionsSnapshot.length}).',
       );
       _logGameFailed('start', code: 'insufficient-questions');
@@ -296,7 +296,7 @@ class QuizController extends StateNotifier<TriviaGameState> {
         session = await ref.read(quizRepositoryProvider).fetchSoloQuiz(
               categoryId: trimmedCategoryId,
             );
-        if (!_validateQuestionCount(session)) {
+        if (!_validateQuestionCount(session, modeLabel: 'Solo matches')) {
           return;
         }
       } on QuizRepositoryException {
@@ -369,7 +369,7 @@ class QuizController extends StateNotifier<TriviaGameState> {
       final gameFunctions = ref.read(gameFunctionsServiceProvider);
       final analytics = ref.read(analyticsServiceProvider);
       final session = await gameFunctions.loadGame(gameId);
-      if (!_validateQuestionCount(session)) {
+      if (!_validateQuestionCount(session, modeLabel: 'Shared games')) {
         return;
       }
       if (_completedGameIds.contains(session.gameId)) {
@@ -404,6 +404,73 @@ class QuizController extends StateNotifier<TriviaGameState> {
         }
       } else {
         _logGameFailed('load');
+        state = state.copyWith(loading: false, error: _formatError(e));
+      }
+    }
+  }
+
+  Future<void> loadSharedQuiz(String quizId) async {
+    final trimmedQuizId = quizId.trim();
+    if (trimmedQuizId.isEmpty) {
+      state = state.copyWith(error: 'This shared quiz link is missing an ID.');
+      _logGameFailed('load_shared', code: 'missing-quiz-id');
+      return;
+    }
+    final userId = ref.read(authUserIdProvider);
+    if (userId == null || userId.isEmpty) {
+      state = state.copyWith(error: 'Please sign in to continue.');
+      _logGameFailed('load_shared', code: 'unauthenticated');
+      return;
+    }
+    final userReady = ref.read(userBootstrapReadyProvider);
+    if (!userReady) {
+      state = state.copyWith(
+        error: 'Your account is still getting set up. Please try again shortly.',
+      );
+      _logGameFailed('load_shared', code: 'user-not-ready');
+      return;
+    }
+    state = state.copyWith(loading: true, error: null);
+    try {
+      final gameFunctions = ref.read(gameFunctionsServiceProvider);
+      final analytics = ref.read(analyticsServiceProvider);
+      final session = await gameFunctions.getSharedQuiz(trimmedQuizId);
+      if (!_validateQuestionCount(session, modeLabel: 'Shared quizzes')) {
+        return;
+      }
+      if (_completedGameIds.contains(session.gameId)) {
+        state = state.copyWith(
+          loading: false,
+          session: null,
+          error: 'That quiz has already been completed.',
+        );
+        return;
+      }
+      analytics.logEvent('trivia_game_started', parameters: {
+        'gameId': session.gameId,
+        'quizId': trimmedQuizId,
+        'source': 'shared_quiz',
+      });
+
+      _selectedIndexByQuestionId.clear();
+      state = TriviaGameState.initial().copyWith(
+        session: session,
+        loading: false,
+        startedAt: DateTime.now(),
+      );
+    } catch (e) {
+      if (e is GameFunctionsException) {
+        _logGameFailed('load_shared', code: e.code);
+        if (_isAlreadyCompletedError(e)) {
+          state = _markAlreadyCompleted(
+            state.copyWith(loading: false),
+            message: _messageForGameError(e),
+          );
+        } else {
+          state = state.copyWith(loading: false, error: _messageForGameError(e));
+        }
+      } else {
+        _logGameFailed('load_shared');
         state = state.copyWith(loading: false, error: _formatError(e));
       }
     }
