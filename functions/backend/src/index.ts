@@ -17,6 +17,13 @@ interface QuestionDoc {
   active: boolean;
 }
 
+interface CategoryProgress {
+  seed: string;
+  cursor: number;
+  exhaustedCount: number;
+  weekKey: string;
+}
+
 /**
  * Utility: deterministic shuffle using seeded RNG
  */
@@ -37,6 +44,26 @@ function seededShuffle<T>(items: T[], seed: string): T[] {
 }
 
 /**
+ * Utility: ISO week key in UTC (YYYY-Www)
+ */
+function isoWeekKey(date: Date = new Date()): string {
+  const target = new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate())
+  );
+  const dayNr = (target.getUTCDay() + 6) % 7;
+  target.setUTCDate(target.getUTCDate() - dayNr + 3);
+  const firstThursday = new Date(Date.UTC(target.getUTCFullYear(), 0, 4));
+  const firstDayNr = (firstThursday.getUTCDay() + 6) % 7;
+  firstThursday.setUTCDate(firstThursday.getUTCDate() - firstDayNr + 3);
+  const weekNo =
+    1 +
+    Math.round(
+      (target.getTime() - firstThursday.getTime()) / (7 * 24 * 3600 * 1000)
+    );
+  return `${target.getUTCFullYear()}-W${String(weekNo).padStart(2, "0")}`;
+}
+
+/**
  * Callable: createGame
  */
 export const createGame = onCall(async (request) => {
@@ -50,14 +77,9 @@ export const createGame = onCall(async (request) => {
     throw new HttpsError("invalid-argument", "topicId is required");
   }
 
-  const topicStatsRef = db.doc(`users/${uid}/topicStats/${topicId}`);
-  const topicStatsSnap = await topicStatsRef.get();
-
-  const seenQuestionIds: string[] =
-    topicStatsSnap.exists &&
-    Array.isArray(topicStatsSnap.data()?.seenQuestionIds)
-      ? topicStatsSnap.data()!.seenQuestionIds
-      : [];
+  const progressRef = db.doc(
+    `users/${uid}/categoryProgress/${topicId}`
+  );
 
   const questionsSnap = await db
     .collection("questions")
@@ -81,16 +103,55 @@ export const createGame = onCall(async (request) => {
     };
   });
 
-  const unseen = allQuestions.filter(
-    (q) => !seenQuestionIds.includes(q.id)
-  );
-
   const gameId = db.collection("games").doc().id;
+  const progressSnap = await progressRef.get();
 
-  const selected = seededShuffle(
-    unseen.length >= 10 ? unseen : allQuestions,
-    gameId
-  ).slice(0, 10);
+  const weekKey = isoWeekKey();
+  const progressData = progressSnap.data() as
+    | Partial<CategoryProgress>
+    | undefined;
+  const progressWeekKey = progressData?.weekKey;
+  const isSameWeek = progressWeekKey === weekKey;
+  const seed =
+    isSameWeek && typeof progressData?.seed === "string"
+      ? progressData.seed
+      : `${uid}-${topicId}-${weekKey}`;
+  const existingCursor = Number.isInteger(progressData?.cursor)
+    ? (progressData!.cursor as number)
+    : 0;
+  const cursorStart = isSameWeek ? existingCursor : 0;
+  const existingExhausted = Number.isInteger(progressData?.exhaustedCount)
+    ? (progressData!.exhaustedCount as number)
+    : 0;
+  const exhaustedBase = isSameWeek ? existingExhausted : 0;
+
+  const poolSize = allQuestions.length;
+  if (poolSize < 10) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Not enough questions to create game"
+    );
+  }
+
+  const shuffled = seededShuffle(allQuestions, seed);
+  const cursorBefore = ((cursorStart % poolSize) + poolSize) % poolSize;
+  const selectionSize = 10;
+  const end = cursorBefore + selectionSize;
+  let selected: QuestionDoc[] = [];
+  let cursorAfter = 0;
+  let exhaustedThisPick = false;
+  if (end <= poolSize) {
+    selected = shuffled.slice(cursorBefore, end);
+    cursorAfter = end === poolSize ? 0 : end;
+    exhaustedThisPick = end === poolSize;
+  } else {
+    selected = [
+      ...shuffled.slice(cursorBefore),
+      ...shuffled.slice(0, end - poolSize),
+    ];
+    cursorAfter = end - poolSize;
+    exhaustedThisPick = true;
+  }
 
   if (selected.length < 10) {
     throw new HttpsError(
@@ -127,9 +188,31 @@ export const createGame = onCall(async (request) => {
     locked: false,
   });
 
+  batch.set(
+    progressRef,
+    {
+      seed,
+      cursor: cursorAfter,
+      exhaustedCount: exhaustedBase + (exhaustedThisPick ? 1 : 0),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      weekKey,
+    },
+    { merge: true }
+  );
+
   await batch.commit();
 
-  return { gameId, questionsSnapshot };
+  return {
+    gameId,
+    questionsSnapshot,
+    selectionMeta: {
+      exhaustedThisPick,
+      poolSize,
+      cursorBefore,
+      cursorAfter,
+      weekKey,
+    },
+  };
 });
 
 /**
