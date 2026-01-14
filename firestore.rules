@@ -59,11 +59,13 @@ service cloud.firestore {
             "seed",
             "cursor",
             "exhaustedCount",
-            "updatedAt"
+            "updatedAt",
+            "weekKey"
           ])
           && request.resource.data.seed is string
           && request.resource.data.cursor is int
-          && request.resource.data.exhaustedCount is int;
+          && request.resource.data.exhaustedCount is int
+          && request.resource.data.weekKey is string;
 
         allow delete: if isOwner(uid);
       }
