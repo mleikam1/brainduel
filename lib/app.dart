@@ -15,6 +15,7 @@ import 'screens/settings_screen.dart';
 import 'screens/topic_select_screen.dart';
 import 'screens/trivia_game_screen.dart';
 import 'screens/post_quiz_ad_screen.dart';
+import 'screens/shared_quiz_screen.dart';
 import 'screens/trivia_result_screen.dart';
 import 'theme/brain_duel_theme.dart';
 
@@ -35,6 +36,7 @@ class TriviaApp extends StatelessWidget {
   static const routeSettings = '/settings';
   static const routeSeasonalEvent = '/events/seasonal';
   static const routeSharedGame = '/g/:gameId';
+  static const routeSharedQuiz = '/quiz/:quizId';
 
   static const nameOnboarding = 'onboarding';
   static const nameGuestAuth = 'guestAuth';
@@ -50,6 +52,7 @@ class TriviaApp extends StatelessWidget {
   static const nameSettings = 'settings';
   static const nameSeasonalEvent = 'seasonalEvent';
   static const nameSharedGame = 'sharedGame';
+  static const nameSharedQuiz = 'sharedQuiz';
   static const nameChallengeIntro = 'challengeIntro';
   static const nameQuestionFlow = 'questionFlow';
   static const nameFollowLink = 'followLink';
@@ -117,6 +120,14 @@ class TriviaApp extends StatelessWidget {
           arguments: TriviaGameLaunchArgs(gameId: state.pathParameters['gameId']),
           child: const TriviaGameScreen(),
         ),
+      ),
+      GoRoute(
+        path: routeSharedQuiz,
+        name: nameSharedQuiz,
+        builder: (context, state) {
+          final quizId = state.pathParameters['quizId'] ?? '';
+          return SharedQuizScreen(quizId: quizId);
+        },
       ),
       GoRoute(
         path: routeResults,
