@@ -158,8 +158,8 @@ class DiscoverScreen extends ConsumerWidget {
                                 child: BDCard(
                                   padding: const EdgeInsets.all(16),
                                   onTap: () => context.pushNamed(
-                                    TriviaApp.nameCategoryDetail,
-                                    extra: topic.category.id,
+                                    TriviaApp.nameGame,
+                                    extra: {'categoryId': topic.category.id},
                                   ),
                                   child: Row(
                                     children: [
@@ -281,8 +281,8 @@ class _DiscoverTopicCard extends StatelessWidget {
     return BDCard(
       padding: const EdgeInsets.all(16),
       onTap: () => context.pushNamed(
-        TriviaApp.nameCategoryDetail,
-        extra: topic.category.id,
+        TriviaApp.nameGame,
+        extra: {'categoryId': topic.category.id},
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
