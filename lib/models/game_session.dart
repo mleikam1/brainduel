@@ -15,9 +15,13 @@ class GameSession {
     final rawQuestions = json['questionsSnapshot'] ?? json['questions'];
     final questionsJson = (rawQuestions as List).cast<Map<String, dynamic>>();
     final questions = questionsJson.map(GameQuestion.fromJson).toList();
+    final topicId = json['topicId'] ?? json['categoryId'];
+    if (topicId == null) {
+      throw StateError('Missing topicId for game session payload.');
+    }
     return GameSession(
-      gameId: json['gameId'] as String,
-      topicId: json['topicId'] as String,
+      gameId: (json['gameId'] ?? json['quizId'] ?? json['sessionId']) as String,
+      topicId: topicId as String,
       questionsSnapshot: questions,
     );
   }

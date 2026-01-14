@@ -293,14 +293,14 @@ class QuizController extends StateNotifier<TriviaGameState> {
       final analytics = ref.read(analyticsServiceProvider);
       GameSession session;
       try {
-        session = await ref.read(quizRepositoryProvider).fetchSoloQuiz(
-              categoryId: trimmedCategoryId,
+        session = await ref.read(gameFunctionsServiceProvider).createGame(
+              topicId: trimmedCategoryId,
+              triviaPackId: packId,
+              mode: 'solo',
             );
         if (!_validateQuestionCount(session, modeLabel: 'Solo matches')) {
           return;
         }
-      } on QuizRepositoryException {
-        rethrow;
       }
       // Fairness requires server-generated question snapshots so clients cannot reshuffle or peek at answers.
       if (_completedGameIds.contains(session.gameId)) {
@@ -327,19 +327,16 @@ class QuizController extends StateNotifier<TriviaGameState> {
         startedAt: DateTime.now(),
       );
     } catch (e) {
-      if (e is QuizRepositoryException) {
+      if (e is GameFunctionsException) {
         _logGameFailed('start', code: e.code);
         if (_isAlreadyCompletedError(e)) {
           state = _markAlreadyCompleted(
             state.copyWith(loading: false),
-            message: _messageForQuizError(e),
+            message: _messageForGameError(e),
           );
         } else {
-          state = state.copyWith(loading: false, error: _messageForQuizError(e));
+          state = state.copyWith(loading: false, error: _messageForGameError(e));
         }
-      } else if (e is GameFunctionsException) {
-        _logGameFailed('start', code: e.code);
-        state = state.copyWith(loading: false, error: _messageForGameError(e));
       } else {
         _logGameFailed('start');
         state = state.copyWith(loading: false, error: _formatError(e));

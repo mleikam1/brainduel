@@ -6,6 +6,7 @@ import '../models/category.dart';
 import '../models/home_dashboard.dart';
 import '../state/home_dashboard_provider.dart';
 import '../state/home_feed_provider.dart';
+import '../state/category_progress_provider.dart';
 import '../state/quiz_controller.dart';
 import '../theme/brain_duel_theme.dart';
 import '../widgets/app_scaffold.dart';
@@ -293,13 +294,13 @@ class _DailyChallengeCard extends StatelessWidget {
   }
 }
 
-class _PackRail extends StatelessWidget {
+class _PackRail extends ConsumerWidget {
   const _PackRail({required this.packs});
 
   final List<Category> packs;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return SizedBox(
       height: 220,
       child: ListView.separated(
@@ -307,10 +308,13 @@ class _PackRail extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         itemBuilder: (context, index) {
           final category = packs[index];
+          final indicator = ref.watch(categoryWeeklyIndicatorProvider(category.id));
           return SizedBox(
             width: 210,
             child: CategoryCard(
               category: category,
+              weeklyState: indicator.state,
+              showWeeklyRefresh: indicator.showWeeklyRefresh,
               onTap: () => context.pushNamed(
                 TriviaApp.nameGame,
                 extra: {'categoryId': category.id},

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../app.dart';
 import '../state/categories_provider.dart';
+import '../state/category_progress_provider.dart';
 import '../theme/brain_duel_theme.dart';
 import '../widgets/app_scaffold.dart';
 import '../widgets/category_card.dart';
@@ -58,8 +59,11 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {
                         final category = filtered[index];
+                        final indicator = ref.watch(categoryWeeklyIndicatorProvider(category.id));
                         return CategoryCard(
                           category: category,
+                          weeklyState: indicator.state,
+                          showWeeklyRefresh: indicator.showWeeklyRefresh,
                           onTap: () {
                             context.pushNamed(
                               TriviaApp.nameCategoryDetail,

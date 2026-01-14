@@ -244,6 +244,7 @@ export const createGame = onCall(async (request) => {
 
   return {
     gameId,
+    topicId,
     questionsSnapshot,
     selectionMeta: {
       exhaustedThisPick,
@@ -252,6 +253,15 @@ export const createGame = onCall(async (request) => {
       cursorAfter,
       weekKey,
     },
+  };
+});
+
+/**
+ * Callable: getWeekKey
+ */
+export const getWeekKey = onCall(async () => {
+  return {
+    weekKey: isoWeekKey(),
   };
 });
 
