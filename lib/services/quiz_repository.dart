@@ -53,7 +53,6 @@ class QuizRepository {
       final snapshot = await _firestore
           .collection('questions')
           .where(FieldPath.documentId, whereIn: chunk)
-          .select(['prompt', 'choices', 'difficulty'])
           .get();
       for (final doc in snapshot.docs) {
         final data = doc.data();
