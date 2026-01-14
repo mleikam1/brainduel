@@ -54,14 +54,16 @@ class QuizRepository {
           .collection('questions')
           .where(FieldPath.documentId, whereIn: chunk)
           .get();
-      for (final doc in snapshot.docs) {
+      final questions = snapshot.docs.map((doc) {
         final data = doc.data();
-        questionById[doc.id] = GameQuestion(
-          id: doc.id,
-          prompt: data['prompt'] as String,
-          choices: List<String>.from(data['choices'] as List),
-          difficulty: (data['difficulty'] as String?) ?? 'medium',
-        );
+        return GameQuestion.fromJson({
+          ...data,
+          'questionId': doc.id,
+          'difficulty': (data['difficulty'] as String?) ?? 'medium',
+        });
+      }).toList();
+      for (final question in questions) {
+        questionById[question.id] = question;
       }
     }
 
