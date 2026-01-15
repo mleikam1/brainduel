@@ -153,6 +153,9 @@ class QuizController extends StateNotifier<TriviaGameState> {
         return 'Please sign in to continue.';
       case 'failed-precondition':
         final details = _formatErrorDetails(error.message, error.details);
+        if (details.contains('no_questions_available')) {
+          return 'No questions are available for this category yet. Please try another.';
+        }
         if (details.contains('user') && details.contains('document')) {
           return 'Your account is still getting set up. Please try again shortly.';
         }
@@ -176,6 +179,9 @@ class QuizController extends StateNotifier<TriviaGameState> {
         return 'Please sign in to continue.';
       case 'failed-precondition':
         final details = _formatErrorDetails(error.message, error.details);
+        if (details.contains('no_questions_available')) {
+          return 'No questions are available for this category yet. Please try another.';
+        }
         if (details.contains('user') && details.contains('document')) {
           return 'Your account is still getting set up. Please try again shortly.';
         }
@@ -230,12 +236,29 @@ class QuizController extends StateNotifier<TriviaGameState> {
     );
   }
 
+  TriviaGameState _markGameStartFailure(String message) {
+    return TriviaGameState.initial().copyWith(
+      loading: false,
+      error: message,
+    );
+  }
+
   void _logGameFailed(String stage, {String? code}) {
     ref.read(analyticsServiceProvider).logEvent(
       'trivia_game_failed',
       parameters: {
         'stage': stage,
         if (code != null) 'code': code,
+      },
+    );
+  }
+
+  void _logGameBlockedNoQuestions(List<String> topics) {
+    ref.read(analyticsServiceProvider).logEvent(
+      'trivia_game_blocked',
+      parameters: {
+        'reason': 'no_questions',
+        'topics': topics,
       },
     );
   }
@@ -318,20 +341,20 @@ class QuizController extends StateNotifier<TriviaGameState> {
     if (state.loading || _isStarting) return;
     final trimmedCategoryId = categoryId.trim();
     if (trimmedCategoryId.isEmpty) {
-      state = state.copyWith(error: 'Please choose a category to continue.');
+      state = _markGameStartFailure('Please choose a category to continue.');
       _logGameFailed('start', code: 'missing-category');
       return;
     }
     final userId = ref.read(authUserIdProvider);
     if (userId == null || userId.isEmpty) {
-      state = state.copyWith(error: 'Please sign in to continue.');
+      state = _markGameStartFailure('Please sign in to continue.');
       _logGameFailed('start', code: 'unauthenticated');
       return;
     }
     final userReady = ref.read(userBootstrapReadyProvider);
     if (!userReady) {
-      state = state.copyWith(
-        error: 'Your account is still getting set up. Please try again shortly.',
+      state = _markGameStartFailure(
+        'Your account is still getting set up. Please try again shortly.',
       );
       _logGameFailed('start', code: 'user-not-ready');
       return;
@@ -342,20 +365,24 @@ class QuizController extends StateNotifier<TriviaGameState> {
       final categories = await ref.read(categoriesProvider.future);
       final categoryExists = categories.any((category) => category.id == trimmedCategoryId);
       if (!categoryExists) {
-        state = state.copyWith(
-          loading: false,
-          error: 'That category is not available right now.',
-        );
+        state = _markGameStartFailure('That category is not available right now.');
         _logGameFailed('start', code: 'category-unavailable');
         return;
       }
       final packId = await ref.read(categoryPackIdProvider(trimmedCategoryId).future);
       if (packId.trim().isEmpty) {
-        state = state.copyWith(
-          loading: false,
-          error: 'That trivia pack is not available right now.',
-        );
+        state = _markGameStartFailure('That trivia pack is not available right now.');
         _logGameFailed('start', code: 'pack-unavailable');
+        return;
+      }
+      final questionCount = await ref
+          .read(gameFunctionsServiceProvider)
+          .fetchQuestionCountForTopic(trimmedCategoryId);
+      if (questionCount <= 0) {
+        _logGameBlockedNoQuestions([trimmedCategoryId]);
+        state = _markGameStartFailure(
+          'No questions are available for this category yet. Please try another.',
+        );
         return;
       }
       final analytics = ref.read(analyticsServiceProvider);
@@ -406,11 +433,11 @@ class QuizController extends StateNotifier<TriviaGameState> {
             message: _messageForGameError(e),
           );
         } else {
-          state = state.copyWith(loading: false, error: _messageForGameError(e));
+          state = _markGameStartFailure(_messageForGameError(e));
         }
       } else {
         _logGameFailed('start');
-        state = state.copyWith(loading: false, error: _formatError(e));
+        state = _markGameStartFailure(_formatError(e));
       }
     } finally {
       _isStarting = false;
@@ -420,14 +447,14 @@ class QuizController extends StateNotifier<TriviaGameState> {
   Future<void> loadGame(String gameId) async {
     final userId = ref.read(authUserIdProvider);
     if (userId == null || userId.isEmpty) {
-      state = state.copyWith(error: 'Please sign in to continue.');
+      state = _markGameStartFailure('Please sign in to continue.');
       _logGameFailed('load', code: 'unauthenticated');
       return;
     }
     final userReady = ref.read(userBootstrapReadyProvider);
     if (!userReady) {
-      state = state.copyWith(
-        error: 'Your account is still getting set up. Please try again shortly.',
+      state = _markGameStartFailure(
+        'Your account is still getting set up. Please try again shortly.',
       );
       _logGameFailed('load', code: 'user-not-ready');
       return;
@@ -473,11 +500,11 @@ class QuizController extends StateNotifier<TriviaGameState> {
             message: _messageForGameError(e),
           );
         } else {
-          state = state.copyWith(loading: false, error: _messageForGameError(e));
+          state = _markGameStartFailure(_messageForGameError(e));
         }
       } else {
         _logGameFailed('load');
-        state = state.copyWith(loading: false, error: _formatError(e));
+        state = _markGameStartFailure(_formatError(e));
       }
     }
   }
@@ -491,14 +518,14 @@ class QuizController extends StateNotifier<TriviaGameState> {
     }
     final userId = ref.read(authUserIdProvider);
     if (userId == null || userId.isEmpty) {
-      state = state.copyWith(error: 'Please sign in to continue.');
+      state = _markGameStartFailure('Please sign in to continue.');
       _logGameFailed('load_shared', code: 'unauthenticated');
       return;
     }
     final userReady = ref.read(userBootstrapReadyProvider);
     if (!userReady) {
-      state = state.copyWith(
-        error: 'Your account is still getting set up. Please try again shortly.',
+      state = _markGameStartFailure(
+        'Your account is still getting set up. Please try again shortly.',
       );
       _logGameFailed('load_shared', code: 'user-not-ready');
       return;
@@ -545,11 +572,11 @@ class QuizController extends StateNotifier<TriviaGameState> {
             message: _messageForGameError(e),
           );
         } else {
-          state = state.copyWith(loading: false, error: _messageForGameError(e));
+          state = _markGameStartFailure(_messageForGameError(e));
         }
       } else {
         _logGameFailed('load_shared');
-        state = state.copyWith(loading: false, error: _formatError(e));
+        state = _markGameStartFailure(_formatError(e));
       }
     }
   }
