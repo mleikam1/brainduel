@@ -35,7 +35,7 @@ interface SharedQuizResponse {
   quizId: string;
   categoryId: string;
   quizSize: number;
-  questionIds: string[];
+  questionDocIds: string[];
   createdBy: string;
   createdAt: admin.firestore.Timestamp;
   expiresAt: admin.firestore.Timestamp;
@@ -271,59 +271,57 @@ export const getWeekKey = onCall(async () => {
 export const createSharedQuiz = onCall(async (request) => {
   const uid = request.auth?.uid;
   const categoryId = request.data?.categoryId as string | undefined;
-  const questionIds = request.data?.questionIds as string[] | undefined;
   const quizSize = request.data?.quizSize as number | undefined;
 
   if (!uid) {
     throw new HttpsError("unauthenticated", "User must be authenticated");
   }
-  if (
-    !categoryId ||
-    !Array.isArray(questionIds) ||
-    questionIds.length === 0 ||
-    typeof quizSize !== "number"
-  ) {
+  if (!categoryId || typeof quizSize !== "number" || quizSize <= 0) {
     throw new HttpsError(
       "invalid-argument",
-      "categoryId, questionIds, and quizSize are required"
+      "categoryId and quizSize are required"
     );
   }
 
-  const uniqueIds = Array.from(new Set(questionIds));
-  if (uniqueIds.length !== questionIds.length) {
-    throw new HttpsError(
-      "invalid-argument",
-      "questionIds must be unique"
-    );
-  }
-  if (quizSize !== questionIds.length) {
-    throw new HttpsError(
-      "invalid-argument",
-      "quizSize must match questionIds length"
-    );
-  }
+  const questionsSnap = await db
+    .collection("questions")
+    .where("topicId", "==", categoryId)
+    .where("active", "==", true)
+    .orderBy(admin.firestore.FieldPath.documentId())
+    .limit(500)
+    .get();
 
-  const questionRefs = questionIds.map((id) => db.doc(`questions/${id}`));
-  const questionDocs = await db.getAll(...questionRefs);
-
-  if (questionDocs.some((doc) => !doc.exists)) {
+  if (questionsSnap.empty) {
     throw new HttpsError(
       "failed-precondition",
-      "One or more questions not found"
+      "No questions available for category"
     );
   }
 
-  questionDocs.forEach((doc) => {
-    const data = doc.data() as QuestionDoc;
-    if (!data.active || data.topicId !== categoryId) {
+  const questionIds = questionsSnap.docs.map((doc) => doc.id);
+  if (questionIds.length < quizSize) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Not enough questions to create shared quiz"
+    );
+  }
+
+  const seed = `shared-${categoryId}-${quizSize}`;
+  const selectedIds = seededShuffle(questionIds, seed).slice(0, quizSize);
+  const questionById = new Map(
+    questionsSnap.docs.map((doc) => [doc.id, doc])
+  );
+  const selectedDocs = selectedIds.map((id) => {
+    const doc = questionById.get(id);
+    if (!doc) {
       throw new HttpsError(
         "failed-precondition",
-        "Question set is invalid for this category"
+        "Selected question set could not be resolved"
       );
     }
+    return doc;
   });
-
-  const questionsSnapshot = questionDocs.map(normalizeQuestionSnapshot);
+  const questionsSnapshot = selectedDocs.map(normalizeQuestionSnapshot);
   const quizId = db.collection("sharedQuizzes").doc().id;
   const createdAt = nowTimestamp();
   const expiresAt = admin.firestore.Timestamp.fromDate(
@@ -334,7 +332,7 @@ export const createSharedQuiz = onCall(async (request) => {
     quizId,
     categoryId,
     quizSize,
-    questionIds,
+    questionDocIds: selectedIds,
     createdBy: uid,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     expiresAt,
@@ -347,7 +345,7 @@ export const createSharedQuiz = onCall(async (request) => {
     quizId,
     categoryId,
     quizSize,
-    questionIds,
+    questionDocIds: selectedIds,
     createdBy: uid,
     createdAt,
     expiresAt,
@@ -388,9 +386,19 @@ export const getSharedQuiz = onCall(async (request) => {
     throw new HttpsError("failed-precondition", "Shared quiz expired");
   }
 
+  const questionDocIds =
+    (data as SharedQuizResponse).questionDocIds ??
+    (data as unknown as { questionIds?: string[] }).questionIds;
+  if (!Array.isArray(questionDocIds) || questionDocIds.length === 0) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Shared quiz is missing questions"
+    );
+  }
+
   let questionsSnapshot = data.questionsSnapshot;
   if (!Array.isArray(questionsSnapshot) || questionsSnapshot.length === 0) {
-    const questionRefs = data.questionIds.map((id) =>
+    const questionRefs = questionDocIds.map((id) =>
       db.doc(`questions/${id}`)
     );
     const questionDocs = await db.getAll(...questionRefs);
@@ -401,7 +409,7 @@ export const getSharedQuiz = onCall(async (request) => {
     quizId,
     categoryId: data.categoryId,
     quizSize: data.quizSize,
-    questionIds: data.questionIds,
+    questionDocIds,
     createdBy: data.createdBy,
     createdAt: data.createdAt,
     expiresAt: data.expiresAt,
