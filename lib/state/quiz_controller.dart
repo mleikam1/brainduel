@@ -4,10 +4,12 @@ import '../models/game_answer.dart';
 import '../models/game_session.dart';
 import '../services/analytics_service.dart';
 import '../services/game_functions_service.dart';
+import '../services/quiz_analytics.dart';
 import '../services/quiz_repository.dart';
 import '../services/local_solo_game_service.dart';
 import 'auth_provider.dart';
 import 'categories_provider.dart';
+import 'category_progress_provider.dart';
 
 enum QuestionPhase {
   reading,
@@ -120,12 +122,17 @@ final quizControllerProvider =
 });
 
 class QuizController extends StateNotifier<TriviaGameState> {
-  QuizController(this.ref) : super(TriviaGameState.initial());
+  QuizController(this.ref)
+      : _quizAnalytics = QuizAnalyticsHelper(ref.read(analyticsServiceProvider)),
+        super(TriviaGameState.initial());
 
   final Ref ref;
   final Map<String, int> _selectedIndexByQuestionId = {};
   final Set<String> _completedGameIds = {};
+  final Set<String> _loggedEventKeys = {};
+  final QuizAnalyticsHelper _quizAnalytics;
   bool _isStarting = false;
+  String? _activeMode;
 
   String _formatError(Object error) {
     if (error is QuizRepositoryException) {
@@ -233,6 +240,66 @@ class QuizController extends StateNotifier<TriviaGameState> {
     );
   }
 
+  void _logOnce(String key, VoidCallback callback) {
+    if (!_loggedEventKeys.add(key)) return;
+    callback();
+  }
+
+  void _logQuizStarted(GameSession session, {required String mode}) {
+    _logOnce('quiz_started:${session.gameId}', () {
+      _quizAnalytics.logQuizStarted(
+        categoryId: session.topicId,
+        mode: mode,
+        quizSize: session.questionsSnapshot.length,
+      );
+    });
+  }
+
+  void _logQuizCompleted({
+    required GameSession session,
+    required int score,
+    required int correctCount,
+    required String mode,
+  }) {
+    _logOnce('quiz_completed:${session.gameId}', () {
+      _quizAnalytics.logQuizCompleted(
+        categoryId: session.topicId,
+        score: score,
+        correctCount: correctCount,
+        mode: mode,
+      );
+    });
+  }
+
+  void _logCategoryExhaustedIfNeeded(GameSession session) {
+    final meta = session.selectionMeta;
+    if (meta == null || !meta.exhaustedThisPick || meta.weekKey.isEmpty) {
+      return;
+    }
+    final progressMap = ref.read(categoryProgressMapProvider).asData?.value;
+    final exhaustedCount = progressMap?[session.topicId]?.exhaustedCount ?? 1;
+    _logOnce('category_exhausted:${session.topicId}:${session.gameId}', () {
+      _quizAnalytics.logCategoryExhausted(
+        categoryId: session.topicId,
+        poolSize: meta.poolSize,
+        exhaustedCount: exhaustedCount,
+        weekKey: meta.weekKey,
+      );
+    });
+  }
+
+  void _logQuizSharedCreated({
+    required String categoryId,
+    required String quizId,
+  }) {
+    _logOnce('quiz_shared_created:$quizId', () {
+      _quizAnalytics.logQuizSharedCreated(
+        categoryId: categoryId,
+        quizId: quizId,
+      );
+    });
+  }
+
   bool _validateQuestionCount(GameSession session, {String modeLabel = 'Solo matches'}) {
     if (session.questionsSnapshot.length < kMinimumSoloQuestionCount) {
       state = state.copyWith(
@@ -318,6 +385,10 @@ class QuizController extends StateNotifier<TriviaGameState> {
         'source': 'category',
       });
 
+      _activeMode = 'solo';
+      _logQuizStarted(session, mode: 'solo');
+      _logCategoryExhaustedIfNeeded(session);
+
       _selectedIndexByQuestionId.clear();
       state = TriviaGameState.initial().copyWith(
         session: session,
@@ -381,6 +452,9 @@ class QuizController extends StateNotifier<TriviaGameState> {
         'gameId': gameId,
         'source': 'shared',
       });
+
+      _activeMode = 'shared';
+      _logQuizStarted(session, mode: 'shared');
 
       _selectedIndexByQuestionId.clear();
       state = TriviaGameState.initial().copyWith(
@@ -451,6 +525,9 @@ class QuizController extends StateNotifier<TriviaGameState> {
         'source': 'shared_quiz',
       });
 
+      _activeMode = 'shared';
+      _logQuizStarted(session, mode: 'shared');
+
       _selectedIndexByQuestionId.clear();
       state = TriviaGameState.initial().copyWith(
         session: session,
@@ -474,6 +551,28 @@ class QuizController extends StateNotifier<TriviaGameState> {
         _logGameFailed('load_shared');
         state = state.copyWith(loading: false, error: _formatError(e));
       }
+    }
+  }
+
+  Future<String?> createSharedQuiz() async {
+    final session = state.session;
+    if (session == null || state.isSubmitting) return null;
+    final questionIds = session.questionsSnapshot.map((question) => question.id).toList();
+    try {
+      final result = await ref.read(gameFunctionsServiceProvider).createSharedQuiz(
+            categoryId: session.topicId,
+            questionIds: questionIds,
+            quizSize: questionIds.length,
+          );
+      _logQuizSharedCreated(
+        categoryId: result.categoryId,
+        quizId: result.quizId,
+      );
+      return result.quizId;
+    } catch (e, st) {
+      debugPrint('QuizController createSharedQuiz error: $e');
+      debugPrintStack(stackTrace: st);
+      return null;
     }
   }
 
@@ -586,6 +685,12 @@ class QuizController extends StateNotifier<TriviaGameState> {
         isSubmitting: false,
         isLocked: true,
       );
+      _logQuizCompleted(
+        session: session,
+        score: result.score,
+        correctCount: result.correct ?? state.correctAnswers,
+        mode: _activeMode ?? 'solo',
+      );
       ref.read(analyticsServiceProvider).logEvent(
         'trivia_game_completed',
         parameters: {
@@ -627,6 +732,8 @@ class QuizController extends StateNotifier<TriviaGameState> {
 
   void reset() {
     _selectedIndexByQuestionId.clear();
+    _loggedEventKeys.clear();
+    _activeMode = null;
     state = TriviaGameState.initial();
   }
 }

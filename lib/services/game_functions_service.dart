@@ -54,6 +54,28 @@ class GameFunctionsService {
     }
   }
 
+  Future<({String quizId, String categoryId})> createSharedQuiz({
+    required String categoryId,
+    required List<String> questionIds,
+    required int quizSize,
+  }) async {
+    try {
+      final callable = _functions.httpsCallable('createSharedQuiz');
+      final result = await callable.call({
+        'categoryId': categoryId,
+        'questionIds': questionIds,
+        'quizSize': quizSize,
+      });
+      final data = _requireMap(result.data, 'createSharedQuiz');
+      return (
+        quizId: data['quizId'] as String,
+        categoryId: (data['categoryId'] as String?) ?? categoryId,
+      );
+    } on FirebaseFunctionsException catch (error) {
+      throw GameFunctionsException.fromFirebase(error);
+    }
+  }
+
   Future<({int score, int maxScore, int? correct, int? total})> completeGame(
     String gameId,
     List<GameAnswer> answers,
