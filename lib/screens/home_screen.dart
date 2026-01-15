@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../app.dart';
 import '../models/category.dart';
+import '../models/category_weekly_indicator.dart';
 import '../models/home_dashboard.dart';
 import '../state/home_dashboard_provider.dart';
 import '../state/home_feed_provider.dart';
@@ -301,6 +302,8 @@ class _PackRail extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final indicatorMap = ref.watch(categoryWeeklyIndicatorMapProvider);
+    final completionMap = ref.watch(categoryCompletionMapProvider);
     return SizedBox(
       height: 220,
       child: ListView.separated(
@@ -308,13 +311,15 @@ class _PackRail extends ConsumerWidget {
         scrollDirection: Axis.horizontal,
         itemBuilder: (context, index) {
           final category = packs[index];
-          final indicator = ref.watch(categoryWeeklyIndicatorProvider(category.id));
+          final indicator = indicatorMap[category.id] ?? const CategoryWeeklyIndicator();
+          final completedThisWeek = completionMap[category.id] ?? false;
           return SizedBox(
             width: 210,
             child: CategoryCard(
               category: category,
               weeklyState: indicator.state,
               showWeeklyRefresh: indicator.showWeeklyRefresh,
+              completedThisWeek: completedThisWeek,
               onTap: () => context.pushNamed(
                 TriviaApp.nameGame,
                 extra: {'categoryId': category.id},

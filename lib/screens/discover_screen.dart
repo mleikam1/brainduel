@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../app.dart';
 import '../models/discover_content.dart';
+import '../state/category_progress_provider.dart';
 import '../state/discover_provider.dart';
 import '../theme/brain_duel_theme.dart';
 import '../utils/category_icon_mapper.dart';
@@ -10,6 +11,7 @@ import '../widgets/app_scaffold.dart';
 import '../widgets/bd_card.dart';
 import '../widgets/bd_stat_pill.dart';
 import '../widgets/brain_duel_bottom_nav.dart';
+import '../widgets/category_completion_badge.dart';
 
 class DiscoverScreen extends ConsumerWidget {
   const DiscoverScreen({
@@ -26,6 +28,7 @@ class DiscoverScreen extends ConsumerWidget {
     final contentAsync = ref.watch(discoverContentProvider);
     final filter = ref.watch(discoverFilterProvider);
     final notifier = ref.read(discoverFilterProvider.notifier);
+    final completionMap = ref.watch(categoryCompletionMapProvider);
 
     return BDAppScaffold(
       title: 'Discover',
@@ -205,7 +208,11 @@ class DiscoverScreen extends ConsumerWidget {
                     : SliverGrid(
                         delegate: SliverChildBuilderDelegate(
                           (context, index) {
-                            return _DiscoverTopicCard(topic: filtered[index]);
+                            final topic = filtered[index];
+                            return _DiscoverTopicCard(
+                              topic: topic,
+                              completedThisWeek: completionMap[topic.category.id] ?? false,
+                            );
                           },
                           childCount: filtered.length,
                         ),
@@ -272,9 +279,13 @@ class _DifficultyChip extends StatelessWidget {
 }
 
 class _DiscoverTopicCard extends StatelessWidget {
-  const _DiscoverTopicCard({required this.topic});
+  const _DiscoverTopicCard({
+    required this.topic,
+    required this.completedThisWeek,
+  });
 
   final DiscoverTopic topic;
+  final bool completedThisWeek;
 
   @override
   Widget build(BuildContext context) {
@@ -284,32 +295,41 @@ class _DiscoverTopicCard extends StatelessWidget {
         TriviaApp.nameGame,
         extra: {'categoryId': topic.category.id},
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Stack(
         children: [
-          Icon(
-            CategoryIconMapper.forCategory(topic.category),
-            size: 28,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            topic.category.title,
-            style: Theme.of(context).textTheme.titleSmall,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            topic.subtitle,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const Spacer(),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              BDStatPill(label: 'Lvl', value: _difficultyText(topic.difficulty)),
-              BDStatPill(label: 'Packs', value: '${topic.packCount}'),
+              Icon(
+                CategoryIconMapper.forCategory(topic.category),
+                size: 28,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                topic.category.title,
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                topic.subtitle,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const Spacer(),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  BDStatPill(label: 'Lvl', value: _difficultyText(topic.difficulty)),
+                  BDStatPill(label: 'Packs', value: '${topic.packCount}'),
+                ],
+              ),
             ],
+          ),
+          Positioned(
+            top: 0,
+            right: 0,
+            child: CategoryCompletionBadge(isCompleted: completedThisWeek),
           ),
         ],
       ),
