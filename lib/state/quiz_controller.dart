@@ -258,7 +258,7 @@ class QuizController extends StateNotifier<TriviaGameState> {
       'trivia_game_blocked',
       parameters: {
         'reason': 'no_questions',
-        'topics': topics,
+        'topics': topics.join(','),
       },
     );
   }
