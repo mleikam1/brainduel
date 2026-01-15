@@ -52,7 +52,7 @@ class GameFunctionsService {
           .where('topicId', isEqualTo: trimmedTopicId)
           .count()
           .get();
-      return (aggregate.count as int?) ?? 0;
+      return aggregate.count;
     } catch (_) {
       return 0;
     }
