@@ -1,5 +1,6 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
+import { emitQuizAnalyticsEvent } from "./analytics";
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -242,6 +243,31 @@ export const createGame = onCall(async (request) => {
 
   await batch.commit();
 
+  const exhaustedCount =
+    exhaustedBase + (exhaustedThisPick ? 1 : 0);
+
+  emitQuizAnalyticsEvent("quiz_started", {
+    categoryId: topicId,
+    quizSize: selectionSize,
+    poolSize,
+    exhaustedCount,
+    weekKey,
+    mode: "solo",
+    quizId: gameId,
+  });
+
+  if (exhaustedThisPick) {
+    emitQuizAnalyticsEvent("category_exhausted", {
+      categoryId: topicId,
+      quizSize: selectionSize,
+      poolSize,
+      exhaustedCount,
+      weekKey,
+      mode: "solo",
+      quizId: gameId,
+    });
+  }
+
   return {
     gameId,
     topicId,
@@ -340,6 +366,16 @@ export const createSharedQuiz = onCall(async (request) => {
   };
 
   await db.doc(`sharedQuizzes/${quizId}`).set(sharedQuizDoc);
+
+  emitQuizAnalyticsEvent("quiz_shared_created", {
+    categoryId,
+    quizSize,
+    poolSize: questionIds.length,
+    exhaustedCount: 0,
+    weekKey: isoWeekKey(),
+    mode: "shared",
+    quizId,
+  });
 
   const response: SharedQuizResponse = {
     quizId,
@@ -524,6 +560,35 @@ export const completeGame = onCall(async (request) => {
   );
 
   await batch.commit();
+
+  const progressRef = db.doc(
+    `users/${uid}/categoryProgress/${topicId}`
+  );
+
+  void (async () => {
+    const progressSnap = await progressRef.get();
+    const progressData = progressSnap.data() as
+      | Partial<CategoryProgress>
+      | undefined;
+    const exhaustedCount = Number.isInteger(
+      progressData?.exhaustedCount
+    )
+      ? (progressData!.exhaustedCount as number)
+      : 0;
+    const weekKey =
+      typeof progressData?.weekKey === "string"
+        ? progressData.weekKey
+        : isoWeekKey();
+
+    emitQuizAnalyticsEvent("quiz_completed", {
+      categoryId: topicId,
+      quizSize: questionIds.length,
+      exhaustedCount,
+      weekKey,
+      mode: "solo",
+      quizId: gameId,
+    });
+  })();
 
   return { score, maxScore: questionIds.length };
 });
