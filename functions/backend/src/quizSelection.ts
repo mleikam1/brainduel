@@ -1,5 +1,6 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
+import { emitQuizAnalyticsEvent } from "./analytics";
 
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -138,16 +139,39 @@ export const selectQuizQuestions = onCall(async (request) => {
     exhaustedThisPick = true;
   }
 
+  const exhaustedCount =
+    exhaustedBase + (exhaustedThisPick ? 1 : 0);
+
   await progressRef.set(
     {
       seed,
       cursor: cursorAfter,
-      exhaustedCount: exhaustedBase + (exhaustedThisPick ? 1 : 0),
+      exhaustedCount,
       weekKey,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     },
     { merge: true }
   );
+
+  emitQuizAnalyticsEvent("quiz_started", {
+    categoryId,
+    quizSize,
+    poolSize,
+    exhaustedCount,
+    weekKey,
+    mode: "solo",
+  });
+
+  if (exhaustedThisPick) {
+    emitQuizAnalyticsEvent("category_exhausted", {
+      categoryId,
+      quizSize,
+      poolSize,
+      exhaustedCount,
+      weekKey,
+      mode: "solo",
+    });
+  }
 
   const response: QuizSelectionResponse = {
     questionIds: selectedIds,
