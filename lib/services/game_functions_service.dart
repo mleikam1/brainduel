@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -26,10 +27,31 @@ class GameFunctionsService {
         'mode': mode,
       });
       final data = _requireMap(result.data, 'createGame');
-      return GameSession.fromJson(data);
+      final rawQuestions = data['questionsSnapshot'] ?? data['questions'];
+      if (rawQuestions is! List || rawQuestions.isEmpty) {
+        throw GameFunctionsException('failed-precondition', 'NO_QUESTIONS_AVAILABLE');
+      }
+      final session = GameSession.fromJson(data);
+      if (session.questionsSnapshot.isEmpty) {
+        throw GameFunctionsException('failed-precondition', 'NO_QUESTIONS_AVAILABLE');
+      }
+      return session;
     } on FirebaseFunctionsException catch (error) {
       throw GameFunctionsException.fromFirebase(error);
     }
+  }
+
+  Future<int> fetchQuestionCountForTopic(String topicId) async {
+    final trimmedTopicId = topicId.trim();
+    if (trimmedTopicId.isEmpty) {
+      return 0;
+    }
+    final aggregate = await FirebaseFirestore.instance
+        .collection('questions')
+        .where('topicId', isEqualTo: trimmedTopicId)
+        .count()
+        .get();
+    return aggregate.count;
   }
 
   Future<GameSession> loadGame(String gameId) async {
