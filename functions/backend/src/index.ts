@@ -519,3 +519,5 @@ export const completeGame = onCall(async (request) => {
 
   return { score, maxScore: questionIds.length };
 });
+
+export * from "./quizSelection";
