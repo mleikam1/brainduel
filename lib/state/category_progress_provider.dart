@@ -30,14 +30,36 @@ final categoryProgressMapProvider = StreamProvider<Map<String, CategoryProgress>
 
 final categoryWeeklyIndicatorProvider =
     Provider.family<CategoryWeeklyIndicator, String>((ref, categoryId) {
+  final indicatorMap = ref.watch(categoryWeeklyIndicatorMapProvider);
+  return indicatorMap[categoryId] ?? const CategoryWeeklyIndicator();
+});
+
+final categoryWeeklyIndicatorMapProvider = Provider<Map<String, CategoryWeeklyIndicator>>((ref) {
   final currentWeekKey = ref.watch(currentWeekKeyProvider).asData?.value;
   final progressMap = ref.watch(categoryProgressMapProvider).asData?.value;
   if (currentWeekKey == null || progressMap == null) {
-    return const CategoryWeeklyIndicator();
+    return const <String, CategoryWeeklyIndicator>{};
   }
 
-  final progress = progressMap[categoryId];
-  if (progress == null || progress.weekKey.isEmpty) {
+  final indicators = <String, CategoryWeeklyIndicator>{};
+  for (final entry in progressMap.entries) {
+    indicators[entry.key] = _indicatorForProgress(entry.value, currentWeekKey);
+  }
+  return indicators;
+});
+
+final categoryCompletionMapProvider = Provider<Map<String, bool>>((ref) {
+  final indicatorMap = ref.watch(categoryWeeklyIndicatorMapProvider);
+  final completed = <String, bool>{};
+  for (final entry in indicatorMap.entries) {
+    // Completed this week if the cursor wrapped at least once (exhausted pick).
+    completed[entry.key] = entry.value.state == CategoryWeeklyState.completed;
+  }
+  return completed;
+});
+
+CategoryWeeklyIndicator _indicatorForProgress(CategoryProgress progress, String currentWeekKey) {
+  if (progress.weekKey.isEmpty) {
     return const CategoryWeeklyIndicator();
   }
 
@@ -54,4 +76,4 @@ final categoryWeeklyIndicatorProvider =
   }
 
   return const CategoryWeeklyIndicator();
-});
+}
