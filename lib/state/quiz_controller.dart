@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/game_answer.dart';
 import '../models/game_session.dart';
@@ -291,16 +292,13 @@ class QuizController extends StateNotifier<TriviaGameState> {
         return;
       }
       final analytics = ref.read(analyticsServiceProvider);
-      GameSession session;
-      try {
-        session = await ref.read(gameFunctionsServiceProvider).createGame(
-              topicId: trimmedCategoryId,
-              triviaPackId: packId,
-              mode: 'solo',
-            );
-        if (!_validateQuestionCount(session, modeLabel: 'Solo matches')) {
-          return;
-        }
+      final session = await ref.read(gameFunctionsServiceProvider).createGame(
+            topicId: trimmedCategoryId,
+            triviaPackId: packId,
+            mode: 'solo',
+          );
+      if (!_validateQuestionCount(session, modeLabel: 'Solo matches')) {
+        return;
       }
       // Fairness requires server-generated question snapshots so clients cannot reshuffle or peek at answers.
       if (_completedGameIds.contains(session.gameId)) {
@@ -326,7 +324,9 @@ class QuizController extends StateNotifier<TriviaGameState> {
         loading: false,
         startedAt: DateTime.now(),
       );
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('QuizController startGame error: $e');
+      debugPrintStack(stackTrace: st);
       if (e is GameFunctionsException) {
         _logGameFailed('start', code: e.code);
         if (_isAlreadyCompletedError(e)) {
@@ -388,7 +388,9 @@ class QuizController extends StateNotifier<TriviaGameState> {
         loading: false,
         startedAt: DateTime.now(),
       );
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('QuizController loadGame error: $e');
+      debugPrintStack(stackTrace: st);
       if (e is GameFunctionsException) {
         _logGameFailed('load', code: e.code);
         if (_isAlreadyCompletedError(e)) {
@@ -455,7 +457,9 @@ class QuizController extends StateNotifier<TriviaGameState> {
         loading: false,
         startedAt: DateTime.now(),
       );
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('QuizController loadSharedQuiz error: $e');
+      debugPrintStack(stackTrace: st);
       if (e is GameFunctionsException) {
         _logGameFailed('load_shared', code: e.code);
         if (_isAlreadyCompletedError(e)) {
@@ -592,7 +596,9 @@ class QuizController extends StateNotifier<TriviaGameState> {
         },
       );
       return result;
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('QuizController completeGame error: $e');
+      debugPrintStack(stackTrace: st);
       if (e is GameFunctionsException) {
         _logGameFailed('complete', code: e.code);
         if (_isAlreadyCompletedError(e)) {
