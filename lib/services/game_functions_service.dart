@@ -46,12 +46,16 @@ class GameFunctionsService {
     if (trimmedTopicId.isEmpty) {
       return 0;
     }
-    final aggregate = await FirebaseFirestore.instance
-        .collection('questions')
-        .where('topicId', isEqualTo: trimmedTopicId)
-        .count()
-        .get();
-    return aggregate.count;
+    try {
+      final aggregate = await FirebaseFirestore.instance
+          .collection('questions')
+          .where('topicId', isEqualTo: trimmedTopicId)
+          .count()
+          .get();
+      return aggregate.count;
+    } catch (_) {
+      return 0;
+    }
   }
 
   Future<GameSession> loadGame(String gameId) async {
