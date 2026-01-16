@@ -58,14 +58,8 @@ service cloud.firestore {
       // Users can read/write their own user doc
       allow read, write: if isOwner(uid);
 
-      // Allow direct access to the categoryProgress document path if requested.
-      match /categoryProgress {
-        allow read, write: if isOwner(uid);
-      }
-
       // Per-category quiz progress
-      match /categoryProgress/{categoryId} {
-
+      match /categoryProgress/{docId} {
         allow read, write: if isOwner(uid);
       }
     }
