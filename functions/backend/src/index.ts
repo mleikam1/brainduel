@@ -196,6 +196,7 @@ async function fetchQuestionsForTopic(
 }> {
   const selectionSize = 10;
   const queryLimit = selectionSize * 6;
+  const categoryQueryId = categoryFallbackId ?? topicId;
 
   const questionQueries: Array<{
     label: string;
@@ -232,31 +233,43 @@ async function fetchQuestionsForTopic(
         .where("topicId", "==", topicId)
         .limit(queryLimit),
     },
+    {
+      label: "categoryId+active",
+      query: db
+        .collection("questions")
+        .where("categoryId", "==", categoryQueryId)
+        .where("active", "==", true)
+        .limit(queryLimit),
+    },
+    {
+      label: "categoryId+isActive",
+      query: db
+        .collection("questions")
+        .where("categoryId", "==", categoryQueryId)
+        .where("isActive", "==", true)
+        .limit(queryLimit),
+    },
+    {
+      label: "categoryId+enabled",
+      query: db
+        .collection("questions")
+        .where("categoryId", "==", categoryQueryId)
+        .where("enabled", "==", true)
+        .limit(queryLimit),
+    },
+    {
+      label: "categoryId",
+      query: db
+        .collection("questions")
+        .where("categoryId", "==", categoryQueryId)
+        .limit(queryLimit),
+    },
   ];
-
-  if (categoryFallbackId && categoryFallbackId !== topicId) {
-    questionQueries.push(
-      {
-        label: "categoryId+active",
-        query: db
-          .collection("questions")
-          .where("categoryId", "==", categoryFallbackId)
-          .where("active", "==", true)
-          .limit(queryLimit),
-      },
-      {
-        label: "categoryId",
-        query: db
-          .collection("questions")
-          .where("categoryId", "==", categoryFallbackId)
-          .limit(queryLimit),
-      }
-    );
-  }
 
   const filterCounts: Record<string, number> = {};
   let questionsSnap: FirebaseFirestore.QuerySnapshot | null = null;
   let appliedFilter = "none";
+  let selectedCount = 0;
 
   for (const { label, query } of questionQueries) {
     // eslint-disable-next-line no-await-in-loop
@@ -267,9 +280,15 @@ async function fetchQuestionsForTopic(
       filter: label,
       count: snap.size,
     });
-    if (!snap.empty && !questionsSnap) {
-      questionsSnap = snap;
-      appliedFilter = label;
+    if (!snap.empty) {
+      if (!questionsSnap || (selectedCount < selectionSize && snap.size > selectedCount)) {
+        questionsSnap = snap;
+        appliedFilter = label;
+        selectedCount = snap.size;
+      }
+      if (selectedCount >= selectionSize) {
+        break;
+      }
     }
   }
 
@@ -370,6 +389,9 @@ export const createGame = onCall(async (request) => {
         inputCategoryId: resolved.inputCategoryId,
         resolvedFrom: resolved.resolvedFrom,
         mappingIssues: resolved.mappingIssues,
+        questionCount: questionDocs.length,
+        fieldsTested: ["topicId", "categoryId", "active", "isActive", "enabled"],
+        filtersApplied: appliedFilter,
         filterCounts,
         triviaPackId,
         packIssues,
@@ -397,7 +419,7 @@ export const createGame = onCall(async (request) => {
   const seed =
     isSameWeek && typeof progressData?.seed === "string"
       ? progressData.seed
-      : `${uid}-${topicId}-${weekKey}`;
+      : `${uid}-${canonicalTopicId}-${weekKey}`;
   const existingCursor = Number.isInteger(progressData?.cursor)
     ? (progressData!.cursor as number)
     : 0;
@@ -426,6 +448,8 @@ export const createGame = onCall(async (request) => {
         mappingIssues: resolved.mappingIssues,
         poolSize,
         appliedFilter,
+        questionCount: questionDocs.length,
+        fieldsTested: ["topicId", "categoryId", "active", "isActive", "enabled"],
         triviaPackId,
         packIssues,
       }
@@ -471,6 +495,8 @@ export const createGame = onCall(async (request) => {
         mappingIssues: resolved.mappingIssues,
         poolSize,
         appliedFilter,
+        questionCount: questionDocs.length,
+        fieldsTested: ["topicId", "categoryId", "active", "isActive", "enabled"],
         triviaPackId,
         packIssues,
       }
