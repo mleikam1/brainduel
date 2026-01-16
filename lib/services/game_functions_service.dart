@@ -131,7 +131,10 @@ class GameFunctionsService {
     if (payload is Map) {
       return Map<String, dynamic>.from(payload);
     }
-    throw StateError('Unexpected $functionName response payload.');
+    throw GameFunctionsException(
+      'internal',
+      'Unexpected $functionName response payload.',
+    );
   }
 }
 
