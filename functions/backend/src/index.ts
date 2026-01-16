@@ -1,4 +1,5 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { logger } from "firebase-functions/logger";
 import * as admin from "firebase-admin";
 import { emitQuizAnalyticsEvent } from "./analytics";
 
@@ -122,17 +123,73 @@ export const createGame = onCall(async (request) => {
     `users/${uid}/categoryProgress/${topicId}`
   );
 
-  const questionsSnap = await db
-    .collection("questions")
-    .where("topicId", "==", topicId)
-    .where("active", "==", true)
-    .limit(200)
-    .get();
+  const questionQueries: Array<{
+    label: string;
+    query: FirebaseFirestore.Query;
+  }> = [
+    {
+      label: "topicId+active",
+      query: db
+        .collection("questions")
+        .where("topicId", "==", topicId)
+        .where("active", "==", true)
+        .limit(200),
+    },
+    {
+      label: "topicId+enabled",
+      query: db
+        .collection("questions")
+        .where("topicId", "==", topicId)
+        .where("enabled", "==", true)
+        .limit(200),
+    },
+    {
+      label: "topicId",
+      query: db
+        .collection("questions")
+        .where("topicId", "==", topicId)
+        .limit(200),
+    },
+    {
+      label: "categoryId+active",
+      query: db
+        .collection("questions")
+        .where("categoryId", "==", topicId)
+        .where("active", "==", true)
+        .limit(200),
+    },
+    {
+      label: "categoryId",
+      query: db
+        .collection("questions")
+        .where("categoryId", "==", topicId)
+        .limit(200),
+    },
+  ];
 
-  if (questionsSnap.empty) {
+  let questionsSnap: FirebaseFirestore.QuerySnapshot | null = null;
+  let appliedFilter = "none";
+  for (const { label, query } of questionQueries) {
+    // eslint-disable-next-line no-await-in-loop
+    const snap = await query.get();
+    logger.info("createGame question query", {
+      topicId,
+      filter: label,
+      count: snap.size,
+    });
+    if (!snap.empty) {
+      questionsSnap = snap;
+      appliedFilter = label;
+      break;
+    }
+  }
+
+  if (!questionsSnap || questionsSnap.empty) {
+    logger.warn("createGame no questions found", { topicId });
     throw new HttpsError(
       "failed-precondition",
-      "No questions available for topic"
+      "No questions available for topic",
+      { topicId }
     );
   }
 
@@ -168,6 +225,11 @@ export const createGame = onCall(async (request) => {
 
   const poolSize = allQuestions.length;
   if (poolSize < 10) {
+    logger.warn("createGame insufficient question pool", {
+      topicId,
+      poolSize,
+      appliedFilter,
+    });
     throw new HttpsError(
       "failed-precondition",
       "Not enough questions to create game"
@@ -195,11 +257,25 @@ export const createGame = onCall(async (request) => {
   }
 
   if (selected.length < 10) {
+    logger.warn("createGame selection too small", {
+      topicId,
+      selectedCount: selected.length,
+      poolSize,
+      appliedFilter,
+    });
     throw new HttpsError(
       "failed-precondition",
       "Not enough questions to create game"
     );
   }
+
+  logger.info("createGame question selection", {
+    topicId,
+    appliedFilter,
+    poolSize,
+    selectedCount: selected.length,
+    selectionIds: selected.slice(0, 5).map((q) => q.id),
+  });
 
   const questionsSnapshot = selected.map((q) => ({
     questionId: q.id,
