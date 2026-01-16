@@ -253,14 +253,30 @@ class QuizController extends StateNotifier<TriviaGameState> {
     );
   }
 
-  void _logGameBlockedNoQuestions(List<String> topics) {
+  void _logGameBlockedNoQuestions({
+    required String topicId,
+    Object? details,
+  }) {
     ref.read(analyticsServiceProvider).logEvent(
       'trivia_game_blocked',
       parameters: {
         'reason': 'no_questions',
-        'topics': topics.join(','),
+        'topic': topicId,
+        if (details != null) 'details': details,
       },
     );
+  }
+
+  bool _isNoQuestionsError(Object error) {
+    if (error is QuizRepositoryException) {
+      return _formatErrorDetails(error.message, error.details)
+          .contains('no_questions_available');
+    }
+    if (error is GameFunctionsException) {
+      return _formatErrorDetails(error.message, error.details)
+          .contains('no_questions_available');
+    }
+    return false;
   }
 
   void _logOnce(String key, VoidCallback callback) {
@@ -375,16 +391,6 @@ class QuizController extends StateNotifier<TriviaGameState> {
         _logGameFailed('start', code: 'pack-unavailable');
         return;
       }
-      final questionCount = await ref
-          .read(gameFunctionsServiceProvider)
-          .fetchQuestionCountForTopic(trimmedCategoryId);
-      if (questionCount <= 0) {
-        _logGameBlockedNoQuestions([trimmedCategoryId]);
-        state = _markGameStartFailure(
-          'No questions are available for this category yet. Please try another.',
-        );
-        return;
-      }
       final analytics = ref.read(analyticsServiceProvider);
       final session = await ref.read(gameFunctionsServiceProvider).createGame(
             topicId: trimmedCategoryId,
@@ -427,6 +433,12 @@ class QuizController extends StateNotifier<TriviaGameState> {
       debugPrintStack(stackTrace: st);
       if (e is GameFunctionsException) {
         _logGameFailed('start', code: e.code);
+        if (_isNoQuestionsError(e)) {
+          _logGameBlockedNoQuestions(
+            topicId: trimmedCategoryId,
+            details: e.details,
+          );
+        }
         if (_isAlreadyCompletedError(e)) {
           state = _markAlreadyCompleted(
             state.copyWith(loading: false),

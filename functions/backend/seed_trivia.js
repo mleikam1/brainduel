@@ -130,6 +130,7 @@ async function main() {
 
   let topicCount = 0;
   let questionCount = 0;
+  const topicQuestionCounts = new Map();
 
   const now = admin.firestore.FieldValue.serverTimestamp();
 
@@ -170,6 +171,7 @@ async function main() {
         {
           id: docId,
           topicId,
+          categoryId: topicId,
           prompt,
           choices: q.choices.map((c) => String(c).trim()),
           correctIndex: q.correctIndex,
@@ -183,6 +185,10 @@ async function main() {
 
       ops++;
       questionCount++;
+      topicQuestionCounts.set(
+        topicId,
+        (topicQuestionCounts.get(topicId) || 0) + 1
+      );
 
       // Firestore batch limit is 500 ops; stay comfortably under
       if (ops >= 450) {
@@ -192,6 +198,10 @@ async function main() {
         console.log("Committed batch...");
       }
     }
+
+    console.log(
+      `Topic ${topicId}: ${topicQuestionCounts.get(topicId) || 0} questions`
+    );
   }
 
   if (ops > 0) {

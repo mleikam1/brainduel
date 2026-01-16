@@ -1,6 +1,12 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import { emitQuizAnalyticsEvent } from "./analytics";
+import {
+  buildTopicCandidates,
+  getQuestionsForTopic,
+  QUESTION_FIELDS,
+  resolveTopicId,
+} from "./triviaQuestions";
 
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -13,13 +19,6 @@ interface CategoryProgress {
   cursor: number;
   exhaustedCount: number;
   weekKey: string;
-}
-
-interface TopicResolution {
-  canonicalTopicId: string;
-  inputTopicId?: string;
-  inputCategoryId?: string;
-  inputTopic?: string;
 }
 
 interface QuizSelectionResponse {
@@ -66,32 +65,6 @@ function isoWeekKey(date: Date = new Date()): string {
   return `${target.getUTCFullYear()}-W${String(weekNo).padStart(2, "0")}`;
 }
 
-function resolveTopicId(
-  topicId?: string,
-  categoryId?: string,
-  topic?: string
-): TopicResolution {
-  const trimmedTopicId = typeof topicId === "string" ? topicId.trim() : "";
-  const trimmedCategoryId =
-    typeof categoryId === "string" ? categoryId.trim() : "";
-  const trimmedTopic = typeof topic === "string" ? topic.trim() : "";
-  const inputTopicId = trimmedTopicId || undefined;
-  const inputCategoryId = trimmedCategoryId || undefined;
-  const inputTopic = trimmedTopic || undefined;
-  const canonicalInput = inputTopicId ?? inputCategoryId ?? inputTopic;
-
-  if (!canonicalInput) {
-    throw new HttpsError("invalid-argument", "Missing topic");
-  }
-
-  return {
-    canonicalTopicId: canonicalInput,
-    inputTopicId,
-    inputCategoryId,
-    inputTopic,
-  };
-}
-
 export const selectQuizQuestions = onCall(async (request) => {
   const uid = request.auth?.uid;
   const categoryId = request.data?.categoryId as string | undefined;
@@ -109,51 +82,46 @@ export const selectQuizQuestions = onCall(async (request) => {
     );
   }
 
-  const resolved = resolveTopicId(topicId, categoryId, topic);
+  const resolved = await resolveTopicId(db, topicId, categoryId, topic);
   const canonicalTopicId = resolved.canonicalTopicId;
-  const fallbackTopicId =
-    resolved.inputCategoryId && resolved.inputCategoryId !== canonicalTopicId
-      ? resolved.inputCategoryId
-      : undefined;
   const progressRef = db.doc(
     `users/${uid}/categoryProgress/${canonicalTopicId}`
   );
   const weekKey = isoWeekKey();
 
-  const [progressSnap, primaryQuestionsSnap] = await Promise.all([
+  const [progressSnap, questionResult] = await Promise.all([
     progressRef.get(),
-    db
-      .collection("questions")
-      .where("topicId", "==", canonicalTopicId)
-      .orderBy(admin.firestore.FieldPath.documentId())
-      .limit(500)
-      .get(),
+    getQuestionsForTopic(db, {
+      resolved,
+      count: quizSize,
+      limit: 500,
+    }),
   ]);
 
-  let questionsSnap = primaryQuestionsSnap;
-  if (questionsSnap.empty && fallbackTopicId) {
-    questionsSnap = await db
-      .collection("questions")
-      .where("categoryId", "==", fallbackTopicId)
-      .orderBy(admin.firestore.FieldPath.documentId())
-      .limit(500)
-      .get();
-  }
-
-  if (questionsSnap.empty) {
+  if (questionResult.docs.length === 0) {
     throw new HttpsError(
       "failed-precondition",
       "NO_QUESTIONS_AVAILABLE",
       {
+        code: "NO_QUESTIONS_AVAILABLE",
         topic: canonicalTopicId,
+        inputTopicId: resolved.inputTopicId,
+        inputCategoryId: resolved.inputCategoryId,
+        inputTopic: resolved.inputTopic,
+        resolvedFrom: resolved.resolvedFrom,
+        mappingIssues: resolved.mappingIssues,
         totalQuestions: 0,
         collection: "questions",
-        testedFields: ["topicId", "categoryId"],
+        fieldsTested: QUESTION_FIELDS,
+        candidateValues: buildTopicCandidates(resolved),
+        queryAttempts: questionResult.attempts,
+        queryLimit: questionResult.queryLimit,
+        appliedFilter: questionResult.appliedFilter,
       }
     );
   }
 
-  const questionIds = questionsSnap.docs.map((doc) => doc.id);
+  const questionIds = questionResult.docs.map((doc) => doc.id);
   const poolSize = questionIds.length;
 
   if (poolSize < quizSize) {
