@@ -33,6 +33,25 @@ interface SharedQuizSnapshotQuestion {
   difficulty: string;
 }
 
+interface TriviaPackDoc {
+  topicId?: string;
+  categoryId?: string;
+  questionIds?: string[];
+  quizSize?: number;
+  size?: number;
+  enabled?: boolean;
+  isEnabled?: boolean;
+}
+
+interface TopicResolution {
+  canonicalTopicId: string;
+  inputTopicId?: string;
+  inputCategoryId?: string;
+  resolvedFrom: string;
+  mappingIssues: string[];
+  categoryFallbackId?: string;
+}
+
 interface SharedQuizResponse {
   quizId: string;
   categoryId: string;
@@ -105,23 +124,78 @@ function normalizeQuestionSnapshot(
   };
 }
 
-/**
- * Callable: createGame
- */
-export const createGame = onCall(async (request) => {
-  const uid = request.auth?.uid;
-  const topicId = request.data?.topicId as string | undefined;
+async function resolveTopicId(
+  topicId?: string,
+  categoryId?: string
+): Promise<TopicResolution> {
+  const trimmedTopicId = typeof topicId === "string" ? topicId.trim() : "";
+  const trimmedCategoryId =
+    typeof categoryId === "string" ? categoryId.trim() : "";
+  const inputTopicId = trimmedTopicId || undefined;
+  const inputCategoryId = trimmedCategoryId || undefined;
 
-  if (!uid) {
-    throw new HttpsError("unauthenticated", "User must be authenticated");
-  }
-  if (!topicId) {
-    throw new HttpsError("invalid-argument", "topicId is required");
+  if (!inputTopicId && !inputCategoryId) {
+    throw new HttpsError(
+      "invalid-argument",
+      "topicId or categoryId is required"
+    );
   }
 
-  const progressRef = db.doc(
-    `users/${uid}/categoryProgress/${topicId}`
-  );
+  const mappingIssues: string[] = [];
+  let resolvedFrom = "fallback";
+  let canonicalTopicId = inputTopicId ?? inputCategoryId!;
+  let categoryFallbackId =
+    inputCategoryId && inputCategoryId !== canonicalTopicId
+      ? inputCategoryId
+      : undefined;
+
+  const topicDocRef = db.doc(`topics/${canonicalTopicId}`);
+  const categoryDocRef = db.doc(`categories/${canonicalTopicId}`);
+  const [topicSnap, categorySnap] = await Promise.all([
+    topicDocRef.get(),
+    categoryDocRef.get(),
+  ]);
+
+  if (topicSnap.exists) {
+    resolvedFrom = "topics";
+  } else if (categorySnap.exists) {
+    resolvedFrom = "categories";
+    const data = categorySnap.data() as { topicId?: string; id?: string };
+    if (typeof data?.topicId === "string" && data.topicId.trim()) {
+      canonicalTopicId = data.topicId.trim();
+      categoryFallbackId = categoryFallbackId ?? inputCategoryId;
+    } else if (typeof data?.id === "string" && data.id.trim()) {
+      canonicalTopicId = data.id.trim();
+    }
+  } else if (inputCategoryId && inputTopicId && inputCategoryId !== inputTopicId) {
+    categoryFallbackId = inputCategoryId;
+    mappingIssues.push("topicId and categoryId differ");
+  }
+
+  if (!topicSnap.exists && !categorySnap.exists) {
+    mappingIssues.push("no matching topic/category doc");
+  }
+
+  return {
+    canonicalTopicId,
+    inputTopicId,
+    inputCategoryId,
+    resolvedFrom,
+    mappingIssues,
+    categoryFallbackId,
+  };
+}
+
+async function fetchQuestionsForTopic(
+  topicId: string,
+  categoryFallbackId?: string
+): Promise<{
+  snapshot: FirebaseFirestore.QuerySnapshot | null;
+  appliedFilter: string;
+  filterCounts: Record<string, number>;
+}> {
+  const selectionSize = 10;
+  const queryLimit = selectionSize * 6;
 
   const questionQueries: Array<{
     label: string;
@@ -133,7 +207,15 @@ export const createGame = onCall(async (request) => {
         .collection("questions")
         .where("topicId", "==", topicId)
         .where("active", "==", true)
-        .limit(200),
+        .limit(queryLimit),
+    },
+    {
+      label: "topicId+isActive",
+      query: db
+        .collection("questions")
+        .where("topicId", "==", topicId)
+        .where("isActive", "==", true)
+        .limit(queryLimit),
     },
     {
       label: "topicId+enabled",
@@ -141,59 +223,161 @@ export const createGame = onCall(async (request) => {
         .collection("questions")
         .where("topicId", "==", topicId)
         .where("enabled", "==", true)
-        .limit(200),
+        .limit(queryLimit),
     },
     {
       label: "topicId",
       query: db
         .collection("questions")
         .where("topicId", "==", topicId)
-        .limit(200),
-    },
-    {
-      label: "categoryId+active",
-      query: db
-        .collection("questions")
-        .where("categoryId", "==", topicId)
-        .where("active", "==", true)
-        .limit(200),
-    },
-    {
-      label: "categoryId",
-      query: db
-        .collection("questions")
-        .where("categoryId", "==", topicId)
-        .limit(200),
+        .limit(queryLimit),
     },
   ];
 
+  if (categoryFallbackId && categoryFallbackId !== topicId) {
+    questionQueries.push(
+      {
+        label: "categoryId+active",
+        query: db
+          .collection("questions")
+          .where("categoryId", "==", categoryFallbackId)
+          .where("active", "==", true)
+          .limit(queryLimit),
+      },
+      {
+        label: "categoryId",
+        query: db
+          .collection("questions")
+          .where("categoryId", "==", categoryFallbackId)
+          .limit(queryLimit),
+      }
+    );
+  }
+
+  const filterCounts: Record<string, number> = {};
   let questionsSnap: FirebaseFirestore.QuerySnapshot | null = null;
   let appliedFilter = "none";
+
   for (const { label, query } of questionQueries) {
     // eslint-disable-next-line no-await-in-loop
     const snap = await query.get();
+    filterCounts[label] = snap.size;
     logger.info("createGame question query", {
       topicId,
       filter: label,
       count: snap.size,
     });
-    if (!snap.empty) {
+    if (!snap.empty && !questionsSnap) {
       questionsSnap = snap;
       appliedFilter = label;
-      break;
     }
   }
 
-  if (!questionsSnap || questionsSnap.empty) {
-    logger.warn("createGame no questions found", { topicId });
+  return { snapshot: questionsSnap, appliedFilter, filterCounts };
+}
+
+/**
+ * Callable: createGame
+ */
+export const createGame = onCall(async (request) => {
+  const uid = request.auth?.uid;
+  const topicId = request.data?.topicId as string | undefined;
+  const categoryId = request.data?.categoryId as string | undefined;
+  const triviaPackId = request.data?.triviaPackId as string | undefined;
+
+  if (!uid) {
+    throw new HttpsError("unauthenticated", "User must be authenticated");
+  }
+  const resolved = await resolveTopicId(topicId, categoryId);
+  const canonicalTopicId = resolved.canonicalTopicId;
+  const progressRef = db.doc(
+    `users/${uid}/categoryProgress/${canonicalTopicId}`
+  );
+
+  let questionDocs: FirebaseFirestore.DocumentSnapshot[] = [];
+  let appliedFilter = "none";
+  let filterCounts: Record<string, number> = {};
+  let packTopicId: string | undefined;
+  let packQuestionIds: string[] | undefined;
+  let packIssues: string[] = [];
+
+  if (typeof triviaPackId === "string" && triviaPackId.trim()) {
+    const packSnap = await db.doc(`trivia_packs/${triviaPackId}`).get();
+    if (packSnap.exists) {
+      const packData = packSnap.data() as TriviaPackDoc;
+      const packEnabled =
+        (typeof packData.isEnabled === "boolean"
+          ? packData.isEnabled
+          : packData.enabled) ?? true;
+      if (!packEnabled) {
+        throw new HttpsError(
+          "failed-precondition",
+          "Trivia pack is disabled",
+          { triviaPackId }
+        );
+      }
+      packTopicId =
+        packData.topicId ??
+        packData.categoryId ??
+        canonicalTopicId;
+      if (Array.isArray(packData.questionIds)) {
+        packQuestionIds = packData.questionIds.filter(
+          (id) => typeof id === "string" && id.trim().length > 0
+        );
+      }
+      if (!packQuestionIds || packQuestionIds.length === 0) {
+        packIssues.push("pack has no questionIds");
+      }
+    } else {
+      packIssues.push("pack not found");
+    }
+  }
+
+  if (packQuestionIds && packQuestionIds.length > 0) {
+    const questionRefs = packQuestionIds.map((id) =>
+      db.doc(`questions/${id}`)
+    );
+    const docs = await db.getAll(...questionRefs);
+    questionDocs = docs.filter((doc) => doc.exists);
+    appliedFilter = "trivia_pack";
+    filterCounts.trivia_pack = questionDocs.length;
+    if (questionDocs.length !== packQuestionIds.length) {
+      packIssues.push("pack contains missing questions");
+    }
+  } else {
+    const queryResult = await fetchQuestionsForTopic(
+      packTopicId ?? canonicalTopicId,
+      resolved.categoryFallbackId
+    );
+    questionDocs = queryResult.snapshot?.docs ?? [];
+    appliedFilter = queryResult.appliedFilter;
+    filterCounts = queryResult.filterCounts;
+  }
+
+  if (questionDocs.length === 0) {
+    logger.warn("createGame no questions found", {
+      topicId: canonicalTopicId,
+      inputTopicId: resolved.inputTopicId,
+      inputCategoryId: resolved.inputCategoryId,
+    });
     throw new HttpsError(
       "failed-precondition",
       "No questions available for topic",
-      { topicId }
+      {
+        code: "NO_QUESTIONS_AVAILABLE",
+        topicId: canonicalTopicId,
+        inputTopicId: resolved.inputTopicId,
+        inputCategoryId: resolved.inputCategoryId,
+        resolvedFrom: resolved.resolvedFrom,
+        mappingIssues: resolved.mappingIssues,
+        filterCounts,
+        triviaPackId,
+        packIssues,
+      }
     );
   }
 
-  const allQuestions: QuestionDoc[] = questionsSnap.docs.map((d) => {
+  const allQuestions: QuestionDoc[] = questionDocs.map((d) => {
     const data = d.data() as Omit<QuestionDoc, "id">;
     return {
       id: d.id,
@@ -226,13 +410,25 @@ export const createGame = onCall(async (request) => {
   const poolSize = allQuestions.length;
   if (poolSize < 10) {
     logger.warn("createGame insufficient question pool", {
-      topicId,
+      topicId: canonicalTopicId,
       poolSize,
       appliedFilter,
     });
     throw new HttpsError(
       "failed-precondition",
-      "Not enough questions to create game"
+      "Not enough questions to create game",
+      {
+        code: "NO_QUESTIONS_AVAILABLE",
+        topicId: canonicalTopicId,
+        inputTopicId: resolved.inputTopicId,
+        inputCategoryId: resolved.inputCategoryId,
+        resolvedFrom: resolved.resolvedFrom,
+        mappingIssues: resolved.mappingIssues,
+        poolSize,
+        appliedFilter,
+        triviaPackId,
+        packIssues,
+      }
     );
   }
 
@@ -258,19 +454,31 @@ export const createGame = onCall(async (request) => {
 
   if (selected.length < 10) {
     logger.warn("createGame selection too small", {
-      topicId,
+      topicId: canonicalTopicId,
       selectedCount: selected.length,
       poolSize,
       appliedFilter,
     });
     throw new HttpsError(
       "failed-precondition",
-      "Not enough questions to create game"
+      "Not enough questions to create game",
+      {
+        code: "NO_QUESTIONS_AVAILABLE",
+        topicId: canonicalTopicId,
+        inputTopicId: resolved.inputTopicId,
+        inputCategoryId: resolved.inputCategoryId,
+        resolvedFrom: resolved.resolvedFrom,
+        mappingIssues: resolved.mappingIssues,
+        poolSize,
+        appliedFilter,
+        triviaPackId,
+        packIssues,
+      }
     );
   }
 
   logger.info("createGame question selection", {
-    topicId,
+    topicId: canonicalTopicId,
     appliedFilter,
     poolSize,
     selectedCount: selected.length,
@@ -291,12 +499,14 @@ export const createGame = onCall(async (request) => {
 
   batch.set(gameRef, {
     gameId,
-    topicId,
+    topicId: canonicalTopicId,
+    categoryId: resolved.inputCategoryId ?? canonicalTopicId,
     createdByUid: uid,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     status: "open",
     questionIds: selected.map((q) => q.id),
     questionsSnapshot,
+    triviaPackId: triviaPackId ?? null,
   });
 
   batch.set(playerRef, {
@@ -323,7 +533,7 @@ export const createGame = onCall(async (request) => {
     exhaustedBase + (exhaustedThisPick ? 1 : 0);
 
   emitQuizAnalyticsEvent("quiz_started", {
-    categoryId: topicId,
+    categoryId: canonicalTopicId,
     quizSize: selectionSize,
     poolSize,
     exhaustedCount,
@@ -334,7 +544,7 @@ export const createGame = onCall(async (request) => {
 
   if (exhaustedThisPick) {
     emitQuizAnalyticsEvent("category_exhausted", {
-      categoryId: topicId,
+      categoryId: canonicalTopicId,
       quizSize: selectionSize,
       poolSize,
       exhaustedCount,
@@ -346,7 +556,8 @@ export const createGame = onCall(async (request) => {
 
   return {
     gameId,
-    topicId,
+    topicId: canonicalTopicId,
+    categoryId: resolved.inputCategoryId ?? canonicalTopicId,
     questionsSnapshot,
     selectionMeta: {
       exhaustedThisPick,
@@ -368,61 +579,162 @@ export const getWeekKey = onCall(async () => {
 });
 
 /**
+ * Callable: loadGame
+ */
+export const loadGame = onCall(async (request) => {
+  const uid = request.auth?.uid;
+  const gameId = request.data?.gameId as string | undefined;
+
+  if (!uid) {
+    throw new HttpsError("unauthenticated", "User must be authenticated");
+  }
+  if (!gameId) {
+    throw new HttpsError("invalid-argument", "gameId is required");
+  }
+
+  const gameSnap = await db.doc(`games/${gameId}`).get();
+  if (!gameSnap.exists) {
+    throw new HttpsError("not-found", "Game not found");
+  }
+
+  const data = gameSnap.data() as {
+    topicId?: string;
+    categoryId?: string;
+    questionIds?: string[];
+    questionsSnapshot?: SharedQuizSnapshotQuestion[];
+  };
+
+  const questionIds = Array.isArray(data.questionIds) ? data.questionIds : [];
+  let questionsSnapshot = Array.isArray(data.questionsSnapshot)
+    ? data.questionsSnapshot
+    : [];
+
+  if (questionsSnapshot.length === 0 && questionIds.length > 0) {
+    const questionRefs = questionIds.map((id) => db.doc(`questions/${id}`));
+    const questionDocs = await db.getAll(...questionRefs);
+    questionsSnapshot = questionDocs
+      .filter((doc) => doc.exists)
+      .map(normalizeQuestionSnapshot);
+  }
+
+  return {
+    gameId,
+    topicId: data.topicId ?? data.categoryId,
+    categoryId: data.categoryId ?? data.topicId,
+    questionsSnapshot,
+  };
+});
+
+/**
  * Callable: createSharedQuiz
  */
 export const createSharedQuiz = onCall(async (request) => {
   const uid = request.auth?.uid;
   const categoryId = request.data?.categoryId as string | undefined;
+  const topicId = request.data?.topicId as string | undefined;
   const quizSize = request.data?.quizSize as number | undefined;
+  const questionIds = request.data?.questionIds as string[] | undefined;
 
   if (!uid) {
     throw new HttpsError("unauthenticated", "User must be authenticated");
   }
-  if (!categoryId || typeof quizSize !== "number" || quizSize <= 0) {
+  if ((!categoryId && !topicId) || typeof quizSize !== "number" || quizSize <= 0) {
     throw new HttpsError(
       "invalid-argument",
-      "categoryId and quizSize are required"
+      "topicId/categoryId and quizSize are required"
     );
   }
 
-  const questionsSnap = await db
-    .collection("questions")
-    .where("topicId", "==", categoryId)
-    .where("active", "==", true)
-    .orderBy(admin.firestore.FieldPath.documentId())
-    .limit(500)
-    .get();
+  const resolved = await resolveTopicId(topicId, categoryId);
+  let selectedIds: string[] = [];
+  let selectedDocs: FirebaseFirestore.DocumentSnapshot[] = [];
+  let poolSize = 0;
 
-  if (questionsSnap.empty) {
-    throw new HttpsError(
-      "failed-precondition",
-      "No questions available for category"
+  if (Array.isArray(questionIds) && questionIds.length > 0) {
+    const uniqueIds = Array.from(new Set(questionIds));
+    const questionRefs = uniqueIds.map((id) =>
+      db.doc(`questions/${id}`)
     );
-  }
-
-  const questionIds = questionsSnap.docs.map((doc) => doc.id);
-  if (questionIds.length < quizSize) {
-    throw new HttpsError(
-      "failed-precondition",
-      "Not enough questions to create shared quiz"
-    );
-  }
-
-  const seed = `shared-${categoryId}-${quizSize}`;
-  const selectedIds = seededShuffle(questionIds, seed).slice(0, quizSize);
-  const questionById = new Map(
-    questionsSnap.docs.map((doc) => [doc.id, doc])
-  );
-  const selectedDocs = selectedIds.map((id) => {
-    const doc = questionById.get(id);
-    if (!doc) {
+    const docs = await db.getAll(...questionRefs);
+    const existingDocs = docs.filter((doc) => doc.exists);
+    if (existingDocs.length !== uniqueIds.length) {
       throw new HttpsError(
         "failed-precondition",
-        "Selected question set could not be resolved"
+        "Shared quiz contains missing questions",
+        { missingCount: uniqueIds.length - existingDocs.length }
       );
     }
-    return doc;
-  });
+    poolSize = existingDocs.length;
+    const mismatched = existingDocs.filter((doc) => {
+      const data = doc.data() as QuestionDoc;
+      return (
+        data.topicId !== resolved.canonicalTopicId &&
+        data.topicId !== resolved.inputCategoryId
+      );
+    });
+    if (mismatched.length > 0) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Shared quiz questions do not match category",
+        { mismatchedCount: mismatched.length }
+      );
+    }
+    selectedDocs = existingDocs.slice(0, quizSize);
+    selectedIds = selectedDocs.map((doc) => doc.id);
+    if (selectedIds.length < quizSize) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Not enough questions to create shared quiz"
+      );
+    }
+  } else {
+    const questionsSnap = await db
+      .collection("questions")
+      .where("topicId", "==", resolved.canonicalTopicId)
+      .where("active", "==", true)
+      .orderBy(admin.firestore.FieldPath.documentId())
+      .limit(500)
+      .get();
+
+    if (questionsSnap.empty) {
+      throw new HttpsError(
+        "failed-precondition",
+        "No questions available for category",
+        {
+          code: "NO_QUESTIONS_AVAILABLE",
+          topicId: resolved.canonicalTopicId,
+          inputTopicId: resolved.inputTopicId,
+          inputCategoryId: resolved.inputCategoryId,
+        }
+      );
+    }
+
+    const poolIds = questionsSnap.docs.map((doc) => doc.id);
+    poolSize = poolIds.length;
+    if (poolSize < quizSize) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Not enough questions to create shared quiz"
+      );
+    }
+
+    const seed = `shared-${resolved.canonicalTopicId}-${quizSize}`;
+    selectedIds = seededShuffle(poolIds, seed).slice(0, quizSize);
+    const questionById = new Map(
+      questionsSnap.docs.map((doc) => [doc.id, doc])
+    );
+    selectedDocs = selectedIds.map((id) => {
+      const doc = questionById.get(id);
+      if (!doc) {
+        throw new HttpsError(
+          "failed-precondition",
+          "Selected question set could not be resolved"
+        );
+      }
+      return doc;
+    });
+  }
+
   const questionsSnapshot = selectedDocs.map(normalizeQuestionSnapshot);
   const quizId = db.collection("sharedQuizzes").doc().id;
   const createdAt = nowTimestamp();
@@ -432,7 +744,7 @@ export const createSharedQuiz = onCall(async (request) => {
 
   const sharedQuizDoc = {
     quizId,
-    categoryId,
+    categoryId: resolved.inputCategoryId ?? resolved.canonicalTopicId,
     quizSize,
     questionDocIds: selectedIds,
     createdBy: uid,
@@ -444,9 +756,9 @@ export const createSharedQuiz = onCall(async (request) => {
   await db.doc(`sharedQuizzes/${quizId}`).set(sharedQuizDoc);
 
   emitQuizAnalyticsEvent("quiz_shared_created", {
-    categoryId,
+    categoryId: resolved.canonicalTopicId,
     quizSize,
-    poolSize: questionIds.length,
+    poolSize,
     exhaustedCount: 0,
     weekKey: isoWeekKey(),
     mode: "shared",
@@ -455,7 +767,7 @@ export const createSharedQuiz = onCall(async (request) => {
 
   const response: SharedQuizResponse = {
     quizId,
-    categoryId,
+    categoryId: resolved.inputCategoryId ?? resolved.canonicalTopicId,
     quizSize,
     questionDocIds: selectedIds,
     createdBy: uid,
@@ -670,3 +982,4 @@ export const completeGame = onCall(async (request) => {
 });
 
 export * from "./quizSelection";
+export * from "./admin/diagnostics";

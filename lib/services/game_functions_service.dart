@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/game_answer.dart';
@@ -37,6 +38,7 @@ class GameFunctionsService {
       }
       return session;
     } on FirebaseFunctionsException catch (error) {
+      _logCallableError('createGame', error);
       throw GameFunctionsException.fromFirebase(error);
     }
   }
@@ -52,7 +54,16 @@ class GameFunctionsService {
           .where('topicId', isEqualTo: trimmedTopicId)
           .count()
           .get();
-      return aggregate.count ?? 0;
+      final count = aggregate.count ?? 0;
+      if (count > 0) {
+        return count;
+      }
+      final fallbackAggregate = await FirebaseFirestore.instance
+          .collection('questions')
+          .where('categoryId', isEqualTo: trimmedTopicId)
+          .count()
+          .get();
+      return fallbackAggregate.count ?? 0;
     } catch (_) {
       return 0;
     }
@@ -65,6 +76,7 @@ class GameFunctionsService {
       final data = _requireMap(result.data, 'loadGame');
       return GameSession.fromJson(data);
     } on FirebaseFunctionsException catch (error) {
+      _logCallableError('loadGame', error);
       throw GameFunctionsException.fromFirebase(error);
     }
   }
@@ -76,6 +88,7 @@ class GameFunctionsService {
       final data = _requireMap(result.data, 'getSharedQuiz');
       return GameSession.fromJson(data);
     } on FirebaseFunctionsException catch (error) {
+      _logCallableError('getSharedQuiz', error);
       throw GameFunctionsException.fromFirebase(error);
     }
   }
@@ -98,6 +111,7 @@ class GameFunctionsService {
         categoryId: (data['categoryId'] as String?) ?? categoryId,
       );
     } on FirebaseFunctionsException catch (error) {
+      _logCallableError('createSharedQuiz', error);
       throw GameFunctionsException.fromFirebase(error);
     }
   }
@@ -120,6 +134,7 @@ class GameFunctionsService {
         total: (data['total'] as num?)?.toInt(),
       );
     } on FirebaseFunctionsException catch (error) {
+      _logCallableError('completeGame', error);
       throw GameFunctionsException.fromFirebase(error);
     }
   }
@@ -134,6 +149,12 @@ class GameFunctionsService {
     throw GameFunctionsException(
       'internal',
       'Unexpected $functionName response payload.',
+    );
+  }
+
+  void _logCallableError(String name, FirebaseFunctionsException error) {
+    debugPrint(
+      'Callable $name failed: code=${error.code} message=${error.message} details=${error.details}',
     );
   }
 }
