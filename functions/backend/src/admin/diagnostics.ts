@@ -1,66 +1,17 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions/logger";
 import * as admin from "firebase-admin";
+import {
+  buildTopicCandidates,
+  QUESTION_FIELDS,
+  resolveTopicId,
+} from "../triviaQuestions";
 
 if (!admin.apps.length) {
   admin.initializeApp();
 }
 
 const db = admin.firestore();
-
-interface TopicResolution {
-  canonicalTopicId: string;
-  inputTopicId?: string;
-  inputCategoryId?: string;
-  inputTopic?: string;
-  resolvedFrom: string;
-  mappingIssues: string[];
-}
-
-async function resolveTopicId(
-  topicId?: string,
-  categoryId?: string,
-  topic?: string
-): Promise<TopicResolution> {
-  const trimmedTopicId = typeof topicId === "string" ? topicId.trim() : "";
-  const trimmedCategoryId =
-    typeof categoryId === "string" ? categoryId.trim() : "";
-  const trimmedTopic = typeof topic === "string" ? topic.trim() : "";
-  const inputTopicId = trimmedTopicId || undefined;
-  const inputCategoryId = trimmedCategoryId || undefined;
-  const inputTopic = trimmedTopic || undefined;
-  const canonicalInput = inputTopicId ?? inputCategoryId ?? inputTopic;
-
-  if (!canonicalInput) {
-    throw new HttpsError("invalid-argument", "Missing topic");
-  }
-
-  const canonicalTopicId = canonicalInput;
-  const mappingIssues: string[] = [];
-  let resolvedFrom = "fallback";
-
-  const [topicSnap, categorySnap] = await Promise.all([
-    db.doc(`topics/${canonicalTopicId}`).get(),
-    db.doc(`categories/${canonicalTopicId}`).get(),
-  ]);
-
-  if (topicSnap.exists) {
-    resolvedFrom = "topics";
-  } else if (categorySnap.exists) {
-    resolvedFrom = "categories";
-  } else {
-    mappingIssues.push("no matching topic/category doc");
-  }
-
-  return {
-    canonicalTopicId,
-    inputTopicId,
-    inputCategoryId,
-    inputTopic,
-    resolvedFrom,
-    mappingIssues,
-  };
-}
 
 function collectMissingFieldWarnings(
   docs: FirebaseFirestore.QueryDocumentSnapshot[]
@@ -93,7 +44,15 @@ function collectMissingFieldWarnings(
   return Array.from(warnings);
 }
 
-export const diagnoseQuestionsForTopic = onCall(async (request) => {
+async function runDiagnostics(request: {
+  auth?: { uid?: string; token?: Record<string, unknown> };
+  data?: {
+    topicId?: string;
+    categoryId?: string;
+    topic?: string;
+    triviaPackId?: string;
+  };
+}) {
   const uid = request.auth?.uid;
   const isAdmin = request.auth?.token?.admin === true;
   const topicId = request.data?.topicId as string | undefined;
@@ -108,29 +67,69 @@ export const diagnoseQuestionsForTopic = onCall(async (request) => {
     );
   }
 
-  const resolved = await resolveTopicId(topicId, categoryId, topic);
+  const resolved = await resolveTopicId(db, topicId, categoryId, topic);
   const baseTopicId = resolved.canonicalTopicId;
+  const candidateValues = buildTopicCandidates(resolved);
 
-  const queries = {
-    topicAny: db.collection("questions").where("topicId", "==", baseTopicId),
-    categoryAny: db.collection("questions").where("categoryId", "==", baseTopicId),
-  };
+  const rootAttempts: Array<{
+    field: string;
+    value: string;
+    count: number;
+  }> = [];
+  const groupAttempts: Array<{
+    field: string;
+    value: string;
+    count: number;
+  }> = [];
 
-  const [topicAnyCount, categoryAnyCount] = await Promise.all([
-    queries.topicAny.count().get(),
-    queries.categoryAny.count().get(),
-  ]);
+  for (const field of QUESTION_FIELDS) {
+    for (const value of candidateValues) {
+      const [rootCount, groupCount] = await Promise.all([
+        db.collection("questions").where(field, "==", value).count().get(),
+        db.collectionGroup("questions").where(field, "==", value).count().get(),
+      ]);
+      rootAttempts.push({
+        field,
+        value,
+        count: rootCount.data().count,
+      });
+      groupAttempts.push({
+        field,
+        value,
+        count: groupCount.data().count,
+      });
+    }
+  }
 
-  const [topicSample, categorySample] = await Promise.all([
-    queries.topicAny
+  const fieldTotals = rootAttempts.reduce((acc, attempt) => {
+    acc[attempt.field] = (acc[attempt.field] ?? 0) + attempt.count;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const groupTotals = groupAttempts.reduce((acc, attempt) => {
+    acc[attempt.field] = (acc[attempt.field] ?? 0) + attempt.count;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const samples: Record<string, string[]> = {};
+  const sampleDocs: FirebaseFirestore.QueryDocumentSnapshot[] = [];
+  for (const field of QUESTION_FIELDS) {
+    const attempt = rootAttempts.find(
+      (entry) => entry.field === field && entry.count > 0
+    );
+    if (!attempt) {
+      samples[field] = [];
+      continue;
+    }
+    const snap = await db
+      .collection("questions")
+      .where(field, "==", attempt.value)
       .orderBy(admin.firestore.FieldPath.documentId())
       .limit(5)
-      .get(),
-    queries.categoryAny
-      .orderBy(admin.firestore.FieldPath.documentId())
-      .limit(5)
-      .get(),
-  ]);
+      .get();
+    samples[field] = snap.docs.map((doc) => doc.id);
+    sampleDocs.push(...snap.docs);
+  }
 
   let packInfo: Record<string, unknown> | null = null;
   if (typeof triviaPackId === "string" && triviaPackId.trim()) {
@@ -140,18 +139,25 @@ export const diagnoseQuestionsForTopic = onCall(async (request) => {
     packInfo = packSnap.exists ? packSnap.data() ?? null : null;
   }
 
-  logger.info("diagnoseQuestionsForTopic", {
+  logger.info("diagnoseTriviaTopic", {
     baseTopicId,
     counts: {
-      topicAny: topicAnyCount.data().count,
-      categoryAny: categoryAnyCount.data().count,
+      fieldTotals,
+      groupTotals,
     },
   });
 
-  const warnings = collectMissingFieldWarnings([
-    ...topicSample.docs,
-    ...categorySample.docs,
-  ]);
+  const warnings = collectMissingFieldWarnings(sampleDocs);
+
+  const totalRoot = rootAttempts.reduce((sum, entry) => sum + entry.count, 0);
+  const totalGroup = groupAttempts.reduce((sum, entry) => sum + entry.count, 0);
+  let blockReason: string | null = null;
+  if (totalRoot === 0 && totalGroup > 0) {
+    blockReason =
+      "questions only found in subcollections; run seed_trivia.js to populate root questions";
+  } else if (totalRoot === 0) {
+    blockReason = "no questions found for requested topic";
+  }
 
   return {
     topicId: baseTopicId,
@@ -160,15 +166,24 @@ export const diagnoseQuestionsForTopic = onCall(async (request) => {
     inputTopic: resolved.inputTopic,
     resolvedFrom: resolved.resolvedFrom,
     mappingIssues: resolved.mappingIssues,
+    candidateValues,
     counts: {
-      topicAny: topicAnyCount.data().count,
-      categoryAny: categoryAnyCount.data().count,
+      rootAttempts,
+      groupAttempts,
+      fieldTotals,
+      groupTotals,
     },
-    samples: {
-      topicIds: topicSample.docs.map((doc) => doc.id),
-      categoryIds: categorySample.docs.map((doc) => doc.id),
-    },
+    samples,
     missingFieldWarnings: warnings,
+    blockReason,
     pack: packInfo,
   };
+}
+
+export const diagnoseTriviaTopic = onCall(async (request) => {
+  return runDiagnostics(request);
+});
+
+export const diagnoseQuestionsForTopic = onCall(async (request) => {
+  return runDiagnostics(request);
 });

@@ -2,6 +2,7 @@
  * trivia_seed.js
  *
  * Ingests trivia_seed.json into Firestore with deterministic question IDs.
+ * NOTE: Uses the canonical root collections (topics + questions).
  */
 
 const admin = require("firebase-admin");
@@ -23,23 +24,38 @@ function generateQuestionId(categoryId, prompt, choices, correctIndex) {
     .slice(0, 16); // short but safe
 }
 
+function normalizeTopicId(id) {
+  return String(id || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_")
+    .replace(/[^a-z0-9_]/g, "")
+    .replace(/_+/g, "_");
+}
+
 async function seed() {
+  let topicCount = 0;
+  let questionCount = 0;
   for (const topic of triviaData.topics) {
-    const { id: categoryId, displayName, questions } = topic;
+    const { id: rawId, displayName, questions } = topic;
+    const categoryId = normalizeTopicId(rawId);
 
-    const categoryRef = db.collection("categories").doc(categoryId);
+    const topicRef = db.collection("topics").doc(categoryId);
 
-    // Upsert category metadata
-    await categoryRef.set(
+    // Upsert topic metadata
+    await topicRef.set(
       {
         id: categoryId,
         displayName,
+        active: true,
         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       },
       { merge: true }
     );
 
-    console.log(`Seeding category: ${categoryId}`);
+    console.log(`Seeding topic: ${categoryId}`);
+    topicCount++;
+    let topicQuestions = 0;
 
     for (const q of questions) {
       const questionId = generateQuestionId(
@@ -49,26 +65,31 @@ async function seed() {
         q.correctIndex
       );
 
-      const questionRef = categoryRef
-        .collection("questions")
-        .doc(questionId);
+      const questionRef = db.collection("questions").doc(questionId);
 
       await questionRef.set(
         {
           id: questionId,            // stored explicitly
           categoryId,
+          topicId: categoryId,
           prompt: q.prompt,
           choices: q.choices,
           correctIndex: q.correctIndex,
           difficulty: q.difficulty,
+          active: true,
           updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         },
         { merge: true }
       );
+      topicQuestions++;
+      questionCount++;
     }
+    console.log(`Topic ${categoryId}: ${topicQuestions} questions`);
   }
 
-  console.log("Trivia seeding complete.");
+  console.log(
+    `Trivia seeding complete. Upserted topics: ${topicCount}, questions: ${questionCount}`
+  );
 }
 
 seed().catch((err) => {

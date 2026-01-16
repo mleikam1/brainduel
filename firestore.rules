@@ -60,8 +60,8 @@ service cloud.firestore {
 
       // Per-category quiz progress
       match /categoryProgress/{docId} {
-        allow read, write: if request.auth != null
-                           && request.auth.uid == uid;
+        // Allow anonymous (Firebase Auth) users to read/write their own progress.
+        allow read, write: if isOwner(uid);
       }
     }
 
