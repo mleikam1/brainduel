@@ -47,6 +47,7 @@ interface TopicResolution {
   canonicalTopicId: string;
   inputTopicId?: string;
   inputCategoryId?: string;
+  inputTopic?: string;
   resolvedFrom: string;
   mappingIssues: string[];
   categoryFallbackId?: string;
@@ -126,24 +127,26 @@ function normalizeQuestionSnapshot(
 
 async function resolveTopicId(
   topicId?: string,
-  categoryId?: string
+  categoryId?: string,
+  topic?: string
 ): Promise<TopicResolution> {
   const trimmedTopicId = typeof topicId === "string" ? topicId.trim() : "";
   const trimmedCategoryId =
     typeof categoryId === "string" ? categoryId.trim() : "";
+  const trimmedTopic = typeof topic === "string" ? topic.trim() : "";
   const inputTopicId = trimmedTopicId || undefined;
   const inputCategoryId = trimmedCategoryId || undefined;
+  const inputTopic = trimmedTopic || undefined;
 
-  if (!inputTopicId && !inputCategoryId) {
-    throw new HttpsError(
-      "invalid-argument",
-      "topicId or categoryId is required"
-    );
+  const canonicalInput = inputTopicId ?? inputCategoryId ?? inputTopic;
+
+  if (!canonicalInput) {
+    throw new HttpsError("invalid-argument", "Missing topic");
   }
 
   const mappingIssues: string[] = [];
   let resolvedFrom = "fallback";
-  let canonicalTopicId = inputTopicId ?? inputCategoryId!;
+  let canonicalTopicId = canonicalInput;
   let categoryFallbackId =
     inputCategoryId && inputCategoryId !== canonicalTopicId
       ? inputCategoryId
@@ -180,6 +183,7 @@ async function resolveTopicId(
     canonicalTopicId,
     inputTopicId,
     inputCategoryId,
+    inputTopic,
     resolvedFrom,
     mappingIssues,
     categoryFallbackId,
@@ -198,101 +202,45 @@ async function fetchQuestionsForTopic(
   const queryLimit = selectionSize * 6;
   const categoryQueryId = categoryFallbackId ?? topicId;
 
-  const questionQueries: Array<{
-    label: string;
-    query: FirebaseFirestore.Query;
-  }> = [
-    {
-      label: "topicId+active",
-      query: db
-        .collection("questions")
-        .where("topicId", "==", topicId)
-        .where("active", "==", true)
-        .limit(queryLimit),
-    },
-    {
-      label: "topicId+isActive",
-      query: db
-        .collection("questions")
-        .where("topicId", "==", topicId)
-        .where("isActive", "==", true)
-        .limit(queryLimit),
-    },
-    {
-      label: "topicId+enabled",
-      query: db
-        .collection("questions")
-        .where("topicId", "==", topicId)
-        .where("enabled", "==", true)
-        .limit(queryLimit),
-    },
-    {
-      label: "topicId",
-      query: db
-        .collection("questions")
-        .where("topicId", "==", topicId)
-        .limit(queryLimit),
-    },
-    {
-      label: "categoryId+active",
-      query: db
-        .collection("questions")
-        .where("categoryId", "==", categoryQueryId)
-        .where("active", "==", true)
-        .limit(queryLimit),
-    },
-    {
-      label: "categoryId+isActive",
-      query: db
-        .collection("questions")
-        .where("categoryId", "==", categoryQueryId)
-        .where("isActive", "==", true)
-        .limit(queryLimit),
-    },
-    {
-      label: "categoryId+enabled",
-      query: db
-        .collection("questions")
-        .where("categoryId", "==", categoryQueryId)
-        .where("enabled", "==", true)
-        .limit(queryLimit),
-    },
-    {
-      label: "categoryId",
-      query: db
-        .collection("questions")
-        .where("categoryId", "==", categoryQueryId)
-        .limit(queryLimit),
-    },
-  ];
-
   const filterCounts: Record<string, number> = {};
-  let questionsSnap: FirebaseFirestore.QuerySnapshot | null = null;
-  let appliedFilter = "none";
-  let selectedCount = 0;
+  const topicQuery = db
+    .collection("questions")
+    .where("topicId", "==", topicId)
+    .limit(queryLimit);
+  const categoryQuery = db
+    .collection("questions")
+    .where("categoryId", "==", categoryQueryId)
+    .limit(queryLimit);
 
-  for (const { label, query } of questionQueries) {
-    // eslint-disable-next-line no-await-in-loop
-    const snap = await query.get();
-    filterCounts[label] = snap.size;
-    logger.info("createGame question query", {
-      topicId,
-      filter: label,
-      count: snap.size,
-    });
-    if (!snap.empty) {
-      if (!questionsSnap || (selectedCount < selectionSize && snap.size > selectedCount)) {
-        questionsSnap = snap;
-        appliedFilter = label;
-        selectedCount = snap.size;
-      }
-      if (selectedCount >= selectionSize) {
-        break;
-      }
-    }
+  const topicSnap = await topicQuery.get();
+  filterCounts.topicId = topicSnap.size;
+  logger.info("createGame question query", {
+    topicId,
+    filter: "topicId",
+    count: topicSnap.size,
+  });
+
+  if (!topicSnap.empty) {
+    return {
+      snapshot: topicSnap,
+      appliedFilter: "topicId",
+      filterCounts,
+    };
   }
 
-  return { snapshot: questionsSnap, appliedFilter, filterCounts };
+  const categorySnap = await categoryQuery.get();
+  filterCounts.categoryId = categorySnap.size;
+  logger.info("createGame question query", {
+    topicId,
+    filter: "categoryId",
+    count: categorySnap.size,
+  });
+
+  return {
+    snapshot: categorySnap.empty ? null : categorySnap,
+    appliedFilter: "categoryId",
+    filterCounts,
+  };
 }
 
 /**
@@ -302,12 +250,13 @@ export const createGame = onCall(async (request) => {
   const uid = request.auth?.uid;
   const topicId = request.data?.topicId as string | undefined;
   const categoryId = request.data?.categoryId as string | undefined;
+  const topic = request.data?.topic as string | undefined;
   const triviaPackId = request.data?.triviaPackId as string | undefined;
 
   if (!uid) {
     throw new HttpsError("unauthenticated", "User must be authenticated");
   }
-  const resolved = await resolveTopicId(topicId, categoryId);
+  const resolved = await resolveTopicId(topicId, categoryId, topic);
   const canonicalTopicId = resolved.canonicalTopicId;
   const progressRef = db.doc(
     `users/${uid}/categoryProgress/${canonicalTopicId}`
@@ -378,23 +327,16 @@ export const createGame = onCall(async (request) => {
       topicId: canonicalTopicId,
       inputTopicId: resolved.inputTopicId,
       inputCategoryId: resolved.inputCategoryId,
+      inputTopic: resolved.inputTopic,
     });
     throw new HttpsError(
       "failed-precondition",
-      "No questions available for topic",
+      "NO_QUESTIONS_AVAILABLE",
       {
-        code: "NO_QUESTIONS_AVAILABLE",
-        topicId: canonicalTopicId,
-        inputTopicId: resolved.inputTopicId,
-        inputCategoryId: resolved.inputCategoryId,
-        resolvedFrom: resolved.resolvedFrom,
-        mappingIssues: resolved.mappingIssues,
-        questionCount: questionDocs.length,
-        fieldsTested: ["topicId", "categoryId", "active", "isActive", "enabled"],
-        filtersApplied: appliedFilter,
-        filterCounts,
-        triviaPackId,
-        packIssues,
+        topic: canonicalTopicId,
+        totalQuestions: 0,
+        collection: "questions",
+        testedFields: ["topicId", "categoryId"],
       }
     );
   }
@@ -449,7 +391,7 @@ export const createGame = onCall(async (request) => {
         poolSize,
         appliedFilter,
         questionCount: questionDocs.length,
-        fieldsTested: ["topicId", "categoryId", "active", "isActive", "enabled"],
+        fieldsTested: ["topicId", "categoryId"],
         triviaPackId,
         packIssues,
       }
@@ -496,7 +438,7 @@ export const createGame = onCall(async (request) => {
         poolSize,
         appliedFilter,
         questionCount: questionDocs.length,
-        fieldsTested: ["topicId", "categoryId", "active", "isActive", "enabled"],
+        fieldsTested: ["topicId", "categoryId"],
         triviaPackId,
         packIssues,
       }
@@ -658,20 +600,21 @@ export const createSharedQuiz = onCall(async (request) => {
   const uid = request.auth?.uid;
   const categoryId = request.data?.categoryId as string | undefined;
   const topicId = request.data?.topicId as string | undefined;
+  const topic = request.data?.topic as string | undefined;
   const quizSize = request.data?.quizSize as number | undefined;
   const questionIds = request.data?.questionIds as string[] | undefined;
 
   if (!uid) {
     throw new HttpsError("unauthenticated", "User must be authenticated");
   }
-  if ((!categoryId && !topicId) || typeof quizSize !== "number" || quizSize <= 0) {
+  if ((!categoryId && !topicId && !topic) || typeof quizSize !== "number" || quizSize <= 0) {
     throw new HttpsError(
       "invalid-argument",
-      "topicId/categoryId and quizSize are required"
+      "topicId/categoryId/topic and quizSize are required"
     );
   }
 
-  const resolved = await resolveTopicId(topicId, categoryId);
+  const resolved = await resolveTopicId(topicId, categoryId, topic);
   let selectedIds: string[] = [];
   let selectedDocs: FirebaseFirestore.DocumentSnapshot[] = [];
   let poolSize = 0;
@@ -714,23 +657,34 @@ export const createSharedQuiz = onCall(async (request) => {
       );
     }
   } else {
-    const questionsSnap = await db
+    let questionsSnap = await db
       .collection("questions")
       .where("topicId", "==", resolved.canonicalTopicId)
-      .where("active", "==", true)
       .orderBy(admin.firestore.FieldPath.documentId())
       .limit(500)
       .get();
 
     if (questionsSnap.empty) {
+      const fallbackTopicId = resolved.categoryFallbackId ?? resolved.inputCategoryId;
+      if (fallbackTopicId) {
+        questionsSnap = await db
+          .collection("questions")
+          .where("categoryId", "==", fallbackTopicId)
+          .orderBy(admin.firestore.FieldPath.documentId())
+          .limit(500)
+          .get();
+      }
+    }
+
+    if (questionsSnap.empty) {
       throw new HttpsError(
         "failed-precondition",
-        "No questions available for category",
+        "NO_QUESTIONS_AVAILABLE",
         {
-          code: "NO_QUESTIONS_AVAILABLE",
-          topicId: resolved.canonicalTopicId,
-          inputTopicId: resolved.inputTopicId,
-          inputCategoryId: resolved.inputCategoryId,
+          topic: resolved.canonicalTopicId,
+          totalQuestions: 0,
+          collection: "questions",
+          testedFields: ["topicId", "categoryId"],
         }
       );
     }

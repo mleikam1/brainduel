@@ -168,6 +168,7 @@ async function main() {
       batch.set(
         questionRef,
         {
+          id: docId,
           topicId,
           prompt,
           choices: q.choices.map((c) => String(c).trim()),

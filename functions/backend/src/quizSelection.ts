@@ -15,6 +15,13 @@ interface CategoryProgress {
   weekKey: string;
 }
 
+interface TopicResolution {
+  canonicalTopicId: string;
+  inputTopicId?: string;
+  inputCategoryId?: string;
+  inputTopic?: string;
+}
+
 interface QuizSelectionResponse {
   questionIds: string[];
   selectionMeta: {
@@ -59,39 +66,90 @@ function isoWeekKey(date: Date = new Date()): string {
   return `${target.getUTCFullYear()}-W${String(weekNo).padStart(2, "0")}`;
 }
 
+function resolveTopicId(
+  topicId?: string,
+  categoryId?: string,
+  topic?: string
+): TopicResolution {
+  const trimmedTopicId = typeof topicId === "string" ? topicId.trim() : "";
+  const trimmedCategoryId =
+    typeof categoryId === "string" ? categoryId.trim() : "";
+  const trimmedTopic = typeof topic === "string" ? topic.trim() : "";
+  const inputTopicId = trimmedTopicId || undefined;
+  const inputCategoryId = trimmedCategoryId || undefined;
+  const inputTopic = trimmedTopic || undefined;
+  const canonicalInput = inputTopicId ?? inputCategoryId ?? inputTopic;
+
+  if (!canonicalInput) {
+    throw new HttpsError("invalid-argument", "Missing topic");
+  }
+
+  return {
+    canonicalTopicId: canonicalInput,
+    inputTopicId,
+    inputCategoryId,
+    inputTopic,
+  };
+}
+
 export const selectQuizQuestions = onCall(async (request) => {
   const uid = request.auth?.uid;
   const categoryId = request.data?.categoryId as string | undefined;
+  const topicId = request.data?.topicId as string | undefined;
+  const topic = request.data?.topic as string | undefined;
   const quizSize = request.data?.quizSize as number | undefined;
 
   if (!uid) {
     throw new HttpsError("unauthenticated", "User must be authenticated");
   }
-  if (!categoryId || typeof quizSize !== "number" || quizSize <= 0) {
+  if ((!categoryId && !topicId && !topic) || typeof quizSize !== "number" || quizSize <= 0) {
     throw new HttpsError(
       "invalid-argument",
-      "categoryId and quizSize are required"
+      "topicId/categoryId/topic and quizSize are required"
     );
   }
 
-  const progressRef = db.doc(`users/${uid}/categoryProgress/${categoryId}`);
+  const resolved = resolveTopicId(topicId, categoryId, topic);
+  const canonicalTopicId = resolved.canonicalTopicId;
+  const fallbackTopicId =
+    resolved.inputCategoryId && resolved.inputCategoryId !== canonicalTopicId
+      ? resolved.inputCategoryId
+      : undefined;
+  const progressRef = db.doc(
+    `users/${uid}/categoryProgress/${canonicalTopicId}`
+  );
   const weekKey = isoWeekKey();
 
-  const [progressSnap, questionsSnap] = await Promise.all([
+  const [progressSnap, primaryQuestionsSnap] = await Promise.all([
     progressRef.get(),
     db
       .collection("questions")
-      .where("topicId", "==", categoryId)
-      .where("active", "==", true)
+      .where("topicId", "==", canonicalTopicId)
       .orderBy(admin.firestore.FieldPath.documentId())
       .limit(500)
       .get(),
   ]);
 
+  let questionsSnap = primaryQuestionsSnap;
+  if (questionsSnap.empty && fallbackTopicId) {
+    questionsSnap = await db
+      .collection("questions")
+      .where("categoryId", "==", fallbackTopicId)
+      .orderBy(admin.firestore.FieldPath.documentId())
+      .limit(500)
+      .get();
+  }
+
   if (questionsSnap.empty) {
     throw new HttpsError(
       "failed-precondition",
-      "No questions available for category"
+      "NO_QUESTIONS_AVAILABLE",
+      {
+        topic: canonicalTopicId,
+        totalQuestions: 0,
+        collection: "questions",
+        testedFields: ["topicId", "categoryId"],
+      }
     );
   }
 
@@ -110,7 +168,7 @@ export const selectQuizQuestions = onCall(async (request) => {
   const seed =
     isSameWeek && typeof progressData?.seed === "string"
       ? progressData.seed
-      : `${uid}-${categoryId}-${weekKey}`;
+      : `${uid}-${canonicalTopicId}-${weekKey}`;
   const cursorStart = isSameWeek && Number.isInteger(progressData?.cursor)
     ? (progressData!.cursor as number)
     : 0;
@@ -154,7 +212,7 @@ export const selectQuizQuestions = onCall(async (request) => {
   );
 
   emitQuizAnalyticsEvent("quiz_started", {
-    categoryId,
+    categoryId: canonicalTopicId,
     quizSize,
     poolSize,
     exhaustedCount,
@@ -164,7 +222,7 @@ export const selectQuizQuestions = onCall(async (request) => {
 
   if (exhaustedThisPick) {
     emitQuizAnalyticsEvent("category_exhausted", {
-      categoryId,
+      categoryId: canonicalTopicId,
       quizSize,
       poolSize,
       exhaustedCount,
