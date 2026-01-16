@@ -24,6 +24,11 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    match /topics/{topicId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     // Categories collection
     match /categories/{categoryId} {
 
@@ -57,6 +62,21 @@ service cloud.firestore {
       match /categoryProgress/{categoryId} {
 
         allow read, write: if isOwner(uid);
+      }
+    }
+
+    /* =========================
+       Games
+       ========================= */
+
+    match /games/{gameId} {
+      // Anonymous users can read game session payloads.
+      allow read: if true;
+      allow write: if false;
+
+      match /players/{playerId} {
+        allow read: if true;
+        allow write: if false;
       }
     }
 
