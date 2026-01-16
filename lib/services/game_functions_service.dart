@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/game_answer.dart';
 import '../models/game_session.dart';
 
-final gameFunctionsServiceProvider = Provider<GameFunctionsService>((_) {
+final gameFunctionsServiceProvider = Provider<GameFunctionsService>((ref) {
   return GameFunctionsService(FirebaseFunctions.instance);
 });
 

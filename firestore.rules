@@ -19,6 +19,11 @@ service cloud.firestore {
        Trivia Question Bank
        ========================= */
 
+    match /questions/{questionId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     // Categories collection
     match /categories/{categoryId} {
 
@@ -51,24 +56,7 @@ service cloud.firestore {
       // Per-category quiz progress
       match /categoryProgress/{categoryId} {
 
-        allow read: if isOwner(uid);
-
-        // Strict schema enforcement to prevent cost explosions
-        allow create, update: if isOwner(uid)
-          && request.resource.data.keys().hasOnly([
-            "seed",
-            "cursor",
-            "exhaustedCount",
-            "updatedAt",
-            "weekKey"
-          ])
-          && request.resource.data.seed is string
-          && request.resource.data.cursor is int
-          && request.resource.data.exhaustedCount is int
-          && request.resource.data.weekKey is string
-          && request.resource.data.updatedAt is timestamp;
-
-        allow delete: if isOwner(uid);
+        allow read, write: if isOwner(uid);
       }
     }
 
