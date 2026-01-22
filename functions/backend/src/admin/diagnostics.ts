@@ -75,37 +75,23 @@ async function runDiagnostics(request: {
     value: string;
     count: number;
   }> = [];
-  const groupAttempts: Array<{
-    field: string;
-    value: string;
-    count: number;
-  }> = [];
 
   for (const field of ["topicId"] as const) {
     for (const value of candidateValues) {
-      const [rootCount, groupCount] = await Promise.all([
-        db.collection("questions").where(field, "==", value).count().get(),
-        db.collectionGroup("questions").where(field, "==", value).count().get(),
-      ]);
+      const rootCount = await db
+        .collection("questions")
+        .where(field, "==", value)
+        .count()
+        .get();
       rootAttempts.push({
         field,
         value,
         count: rootCount.data().count,
       });
-      groupAttempts.push({
-        field,
-        value,
-        count: groupCount.data().count,
-      });
     }
   }
 
   const fieldTotals = rootAttempts.reduce((acc, attempt) => {
-    acc[attempt.field] = (acc[attempt.field] ?? 0) + attempt.count;
-    return acc;
-  }, {} as Record<string, number>);
-
-  const groupTotals = groupAttempts.reduce((acc, attempt) => {
     acc[attempt.field] = (acc[attempt.field] ?? 0) + attempt.count;
     return acc;
   }, {} as Record<string, number>);
@@ -142,19 +128,14 @@ async function runDiagnostics(request: {
     baseTopicId,
     counts: {
       fieldTotals,
-      groupTotals,
     },
   });
 
   const warnings = collectMissingFieldWarnings(sampleDocs);
 
   const totalRoot = rootAttempts.reduce((sum, entry) => sum + entry.count, 0);
-  const totalGroup = groupAttempts.reduce((sum, entry) => sum + entry.count, 0);
   let blockReason: string | null = null;
-  if (totalRoot === 0 && totalGroup > 0) {
-    blockReason =
-      "questions only found in subcollections; run seed_trivia.js to populate root questions";
-  } else if (totalRoot === 0) {
+  if (totalRoot === 0) {
     blockReason = "no questions found for requested topic";
   }
 
@@ -168,9 +149,7 @@ async function runDiagnostics(request: {
     candidateValues,
     counts: {
       rootAttempts,
-      groupAttempts,
       fieldTotals,
-      groupTotals,
     },
     samples,
     missingFieldWarnings: warnings,

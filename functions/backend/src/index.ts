@@ -3,7 +3,11 @@ import { logger } from "firebase-functions/logger";
 import * as admin from "firebase-admin";
 import type { FirebaseFirestore } from "firebase-admin";
 import { emitQuizAnalyticsEvent } from "./analytics";
-import { createTriviaPackFromDocs, selectRandomDocs } from "./triviaQuestions";
+import {
+  createTriviaPackFromDocs,
+  resolveTopicId,
+  selectRandomDocs,
+} from "./triviaQuestions";
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -113,10 +117,12 @@ export const createGame = onCall(async (request) => {
   if (!uid) {
     throw new HttpsError("unauthenticated", "User must be authenticated");
   }
-  const trimmedTopicId = typeof topicId === "string" ? topicId.trim() : "";
-  if (!trimmedTopicId) {
+  const rawTopicId = typeof topicId === "string" ? topicId.trim() : "";
+  if (!rawTopicId) {
     throw new HttpsError("invalid-argument", "topicId is required");
   }
+  const resolved = await resolveTopicId(db, rawTopicId);
+  const canonicalTopicId = resolved.canonicalTopicId;
 
   const requestedSize = 10;
   let questionDocs: FirebaseFirestore.QueryDocumentSnapshot[] = [];
@@ -125,18 +131,22 @@ export const createGame = onCall(async (request) => {
 
   const topicQuerySnap = await db
     .collection("questions")
-    .where("topicId", "==", trimmedTopicId)
+    .where("topicId", "==", canonicalTopicId)
     .get();
   logger.info("createGame topic query", {
-    topicId: trimmedTopicId,
+    topicId: canonicalTopicId,
+    inputTopicId: rawTopicId,
+    resolvedFrom: resolved.resolvedFrom,
+    mappingIssues: resolved.mappingIssues,
     topicQueryCount: topicQuerySnap.size,
   });
 
   if (topicQuerySnap.empty) {
     usedFallback = true;
     logger.warn("createGame topic query empty; falling back to all questions", {
-      topicId: trimmedTopicId,
-      query: { topicId: trimmedTopicId },
+      topicId: canonicalTopicId,
+      inputTopicId: rawTopicId,
+      query: { topicId: canonicalTopicId },
     });
     const fallbackSnap = await db.collection("questions").get();
     questionDocs = fallbackSnap.docs;
@@ -146,7 +156,8 @@ export const createGame = onCall(async (request) => {
 
   if (questionDocs.length === 0) {
     logger.warn("createGame no questions available after fallback", {
-      topicId: trimmedTopicId,
+      topicId: canonicalTopicId,
+      inputTopicId: rawTopicId,
       usedFallback,
     });
     throw new HttpsError("failed-precondition", "No questions available");
@@ -162,7 +173,7 @@ export const createGame = onCall(async (request) => {
   });
 
   const packResult = await createTriviaPackFromDocs(db, {
-    topicId: trimmedTopicId,
+    topicId: canonicalTopicId,
     questionDocs: selectedDocs,
     createdBy: uid,
   });
@@ -174,7 +185,7 @@ export const createGame = onCall(async (request) => {
   const selectionSize = selected.length;
 
   logger.info("createGame question selection", {
-    topicId: trimmedTopicId,
+    topicId: canonicalTopicId,
     poolSize,
     selectedCount: selected.length,
     usedFallback,
@@ -182,7 +193,7 @@ export const createGame = onCall(async (request) => {
   });
 
   logger.info("createGame pack summary", {
-    topicId: trimmedTopicId,
+    topicId: canonicalTopicId,
     usedFallback,
     finalPackCount: selectionSize,
   });
@@ -201,8 +212,8 @@ export const createGame = onCall(async (request) => {
 
   batch.set(gameRef, {
     gameId,
-    topicId: trimmedTopicId,
-    categoryId: trimmedTopicId,
+    topicId: canonicalTopicId,
+    categoryId: canonicalTopicId,
     createdByUid: uid,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     status: "open",
@@ -220,7 +231,7 @@ export const createGame = onCall(async (request) => {
   await batch.commit();
 
   emitQuizAnalyticsEvent("quiz_started", {
-    categoryId: trimmedTopicId,
+    categoryId: canonicalTopicId,
     quizSize: selectionSize,
     poolSize,
     exhaustedCount: 0,
@@ -231,8 +242,8 @@ export const createGame = onCall(async (request) => {
 
   return {
     gameId,
-    topicId: trimmedTopicId,
-    categoryId: trimmedTopicId,
+    topicId: canonicalTopicId,
+    categoryId: canonicalTopicId,
     questionsSnapshot,
     triviaPackId: triviaPackRefId ?? null,
   };
