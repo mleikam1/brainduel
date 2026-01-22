@@ -3,9 +3,7 @@ import { logger } from "firebase-functions/logger";
 import * as admin from "firebase-admin";
 import type { FirebaseFirestore } from "firebase-admin";
 import { emitQuizAnalyticsEvent } from "./analytics";
-import {
-  generateTriviaPack,
-} from "./triviaQuestions";
+import { createTriviaPackFromDocs, selectRandomDocs } from "./triviaQuestions";
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -123,43 +121,52 @@ export const createGame = onCall(async (request) => {
   const requestedSize = 10;
   let questionDocs: FirebaseFirestore.QueryDocumentSnapshot[] = [];
   let triviaPackRefId: string | null = null;
+  let usedFallback = false;
 
-  try {
-    const packResult = await generateTriviaPack(db, {
+  const topicQuerySnap = await db
+    .collection("questions")
+    .where("topicId", "==", trimmedTopicId)
+    .get();
+  logger.info("createGame topic query", {
+    topicId: trimmedTopicId,
+    topicQueryCount: topicQuerySnap.size,
+  });
+
+  if (topicQuerySnap.empty) {
+    usedFallback = true;
+    logger.warn("createGame topic query empty; falling back to all questions", {
       topicId: trimmedTopicId,
-      questionCount: requestedSize,
-      createdBy: uid,
+      query: { topicId: trimmedTopicId },
     });
-    questionDocs = packResult.questionDocs;
-    triviaPackRefId = packResult.packId;
-  } catch (error) {
-    if (error instanceof HttpsError && error.code === "failed-precondition") {
-      // TEMPORARY: Force-play bypass for testing when topic has no questions.
-      logger.warn("TEMPORARY createGame fallback: no topic questions found.", {
-        topicId: trimmedTopicId,
-      });
-      const fallbackSnap = await db
-        .collection("questions")
-        .orderBy(admin.firestore.FieldPath.documentId())
-        .limit(5)
-        .get();
-      questionDocs = fallbackSnap.docs;
-    } else {
-      throw error;
-    }
+    const fallbackSnap = await db.collection("questions").get();
+    questionDocs = fallbackSnap.docs;
+  } else {
+    questionDocs = topicQuerySnap.docs;
   }
 
   if (questionDocs.length === 0) {
+    logger.warn("createGame no questions available after fallback", {
+      topicId: trimmedTopicId,
+      usedFallback,
+    });
     throw new HttpsError("failed-precondition", "No questions available");
   }
 
-  const allQuestions: QuestionDoc[] = questionDocs.map((d) => {
+  const selectedDocs = selectRandomDocs(questionDocs, requestedSize);
+  const allQuestions: QuestionDoc[] = selectedDocs.map((d) => {
     const data = d.data() as Omit<QuestionDoc, "id">;
     return {
       id: d.id,
       ...data,
     };
   });
+
+  const packResult = await createTriviaPackFromDocs(db, {
+    topicId: trimmedTopicId,
+    questionDocs: selectedDocs,
+    createdBy: uid,
+  });
+  triviaPackRefId = packResult.packId;
 
   const gameId = db.collection("games").doc().id;
   const poolSize = allQuestions.length;
@@ -170,7 +177,14 @@ export const createGame = onCall(async (request) => {
     topicId: trimmedTopicId,
     poolSize,
     selectedCount: selected.length,
+    usedFallback,
     selectionIds: selected.slice(0, 5).map((q) => q.id),
+  });
+
+  logger.info("createGame pack summary", {
+    topicId: trimmedTopicId,
+    usedFallback,
+    finalPackCount: selectionSize,
   });
 
   const questionsSnapshot = selected.map((q) => ({

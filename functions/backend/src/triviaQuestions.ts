@@ -30,6 +30,13 @@ export interface TriviaPackGenerationResult {
   totalQuestions: number;
 }
 
+export interface TriviaPackCreationResult {
+  packId: string;
+  topicId: string;
+  questionIds: string[];
+  questionDocs: FirebaseFirestore.QueryDocumentSnapshot[];
+}
+
 export function normalizeTopicKey(value: string): string {
   return String(value || "")
     .trim()
@@ -176,6 +183,14 @@ function shuffleInPlace<T>(items: T[]): T[] {
   return items;
 }
 
+export function selectRandomDocs<T>(items: T[], limit?: number): T[] {
+  const shuffled = shuffleInPlace([...items]);
+  if (typeof limit === "number" && limit > 0 && limit < shuffled.length) {
+    return shuffled.slice(0, limit);
+  }
+  return shuffled;
+}
+
 export async function getRandomQuestionsForTopic(
   db: FirebaseFirestore.Firestore,
   options: {
@@ -199,11 +214,7 @@ export async function getRandomQuestionsForTopic(
       topicId,
     };
   }
-  const shuffledDocs = shuffleInPlace([...allDocs]);
-  const selectedDocs =
-    typeof limit === "number" && limit > 0 && limit < shuffledDocs.length
-      ? shuffledDocs.slice(0, limit)
-      : shuffledDocs;
+  const selectedDocs = selectRandomDocs(allDocs, limit);
   return {
     docs: selectedDocs,
     questionIds: selectedDocs.map((doc) => doc.id),
@@ -253,5 +264,35 @@ export async function generateTriviaPack(
     appliedFilter: "topicId",
     appliedValue: trimmedTopicId,
     totalQuestions: questionResult.totalQuestions,
+  };
+}
+
+export async function createTriviaPackFromDocs(
+  db: FirebaseFirestore.Firestore,
+  options: {
+    topicId: string;
+    questionDocs: FirebaseFirestore.QueryDocumentSnapshot[];
+    createdBy: string;
+  }
+): Promise<TriviaPackCreationResult> {
+  const trimmedTopicId = options.topicId.trim();
+  if (!trimmedTopicId) {
+    throw new HttpsError("invalid-argument", "Missing topicId");
+  }
+  const questionIds = options.questionDocs.map((doc) => doc.id);
+  const packRef = db.collection("trivia_packs").doc();
+  await packRef.set({
+    id: packRef.id,
+    topicId: trimmedTopicId,
+    questionIds,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    createdBy: options.createdBy,
+  });
+
+  return {
+    packId: packRef.id,
+    topicId: trimmedTopicId,
+    questionIds,
+    questionDocs: options.questionDocs,
   };
 }
