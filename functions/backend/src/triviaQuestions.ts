@@ -1,5 +1,6 @@
 import { HttpsError } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions/logger";
+import * as admin from "firebase-admin";
 import type { FirebaseFirestore } from "firebase-admin";
 
 export const QUESTION_FIELDS = [
@@ -37,6 +38,18 @@ export interface QuestionFetchResult {
   fieldsTested: QuestionField[];
   queryLimit: number;
   collection: string;
+}
+
+export interface TriviaPackGenerationResult {
+  packId: string;
+  topicId: string;
+  questionIds: string[];
+  questionDocs: FirebaseFirestore.QueryDocumentSnapshot[];
+  appliedFilter: string;
+  appliedValue?: string;
+  totalQuestions: number;
+  attempts: QuestionQueryAttempt[];
+  queryLimit: number;
 }
 
 export function normalizeTopicKey(value: string): string {
@@ -227,5 +240,131 @@ export async function getQuestionsForTopic(
     fieldsTested,
     queryLimit,
     collection: "questions",
+  };
+}
+
+function shuffleInPlace<T>(items: T[]): T[] {
+  for (let i = items.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [items[i], items[j]] = [items[j], items[i]];
+  }
+  return items;
+}
+
+async function findQuestionQueryForTopic(
+  db: FirebaseFirestore.Firestore,
+  resolved: TopicResolution,
+  count: number
+): Promise<{
+  query: FirebaseFirestore.Query;
+  appliedFilter: string;
+  appliedValue: string;
+  attempts: QuestionQueryAttempt[];
+  queryLimit: number;
+}> {
+  const candidateValues = buildTopicCandidates(resolved);
+  const fieldsTested = [...QUESTION_FIELDS];
+  const queryLimit = Math.max(count * 6, count);
+  const attempts: QuestionQueryAttempt[] = [];
+
+  for (const field of fieldsTested) {
+    for (const value of candidateValues) {
+      const query = db.collection("questions").where(field, "==", value);
+      const countSnap = await query.count().get();
+      const total = countSnap.data().count;
+      attempts.push({ field, value, count: total });
+      logger.info("question query attempt", {
+        field,
+        value,
+        count: total,
+        limit: queryLimit,
+      });
+      if (total > 0) {
+        return {
+          query,
+          appliedFilter: field,
+          appliedValue: value,
+          attempts,
+          queryLimit,
+        };
+      }
+    }
+  }
+
+  throw new HttpsError(
+    "failed-precondition",
+    "NO_QUESTIONS_EXIST_FOR_TOPIC",
+    {
+      code: "NO_QUESTIONS_EXIST_FOR_TOPIC",
+      topic: resolved.canonicalTopicId,
+      inputTopicId: resolved.inputTopicId,
+      inputCategoryId: resolved.inputCategoryId,
+      inputTopic: resolved.inputTopic,
+      resolvedFrom: resolved.resolvedFrom,
+      mappingIssues: resolved.mappingIssues,
+      totalQuestions: 0,
+      collection: "questions",
+      fieldsTested,
+      candidateValues,
+      queryLimit,
+      attempts,
+    }
+  );
+}
+
+export async function generateTriviaPack(
+  db: FirebaseFirestore.Firestore,
+  options: {
+    topicId: string;
+    questionCount: number;
+    createdBy: string;
+  }
+): Promise<TriviaPackGenerationResult> {
+  const resolved = await resolveTopicId(db, options.topicId);
+  const queryResult = await findQuestionQueryForTopic(
+    db,
+    resolved,
+    options.questionCount
+  );
+
+  const questionSnap = await queryResult.query.get();
+  const questionDocs = questionSnap.docs;
+  if (questionDocs.length === 0) {
+    throw new HttpsError(
+      "failed-precondition",
+      "NO_QUESTIONS_EXIST_FOR_TOPIC",
+      {
+        code: "NO_QUESTIONS_EXIST_FOR_TOPIC",
+        topic: resolved.canonicalTopicId,
+      }
+    );
+  }
+
+  const shuffledDocs = shuffleInPlace([...questionDocs]);
+  const selectedDocs =
+    options.questionCount >= shuffledDocs.length
+      ? shuffledDocs
+      : shuffledDocs.slice(0, options.questionCount);
+  const questionIds = selectedDocs.map((doc) => doc.id);
+
+  const packRef = db.collection("trivia_packs").doc();
+  await packRef.set({
+    id: packRef.id,
+    topicId: resolved.canonicalTopicId,
+    questionIds,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    createdBy: options.createdBy,
+  });
+
+  return {
+    packId: packRef.id,
+    topicId: resolved.canonicalTopicId,
+    questionIds,
+    questionDocs: selectedDocs,
+    appliedFilter: queryResult.appliedFilter,
+    appliedValue: queryResult.appliedValue,
+    totalQuestions: questionDocs.length,
+    attempts: queryResult.attempts,
+    queryLimit: queryResult.queryLimit,
   };
 }

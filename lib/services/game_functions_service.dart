@@ -17,24 +17,26 @@ class GameFunctionsService {
 
   Future<GameSession> createGame({
     required String topicId,
-    required String triviaPackId,
     required String mode,
+    String? triviaPackId,
   }) async {
     try {
       final callable = _functions.httpsCallable('createGame');
-      final result = await callable.call({
+      final payload = {
         'topicId': topicId,
-        'triviaPackId': triviaPackId,
         'mode': mode,
-      });
+        if (triviaPackId != null && triviaPackId.trim().isNotEmpty)
+          'triviaPackId': triviaPackId.trim(),
+      };
+      final result = await callable.call(payload);
       final data = _requireMap(result.data, 'createGame');
       final rawQuestions = data['questionsSnapshot'] ?? data['questions'];
       if (rawQuestions is! List || rawQuestions.isEmpty) {
-        throw GameFunctionsException('failed-precondition', 'NO_QUESTIONS_AVAILABLE');
+        throw GameFunctionsException('failed-precondition', 'NO_QUESTIONS_EXIST_FOR_TOPIC');
       }
       final session = GameSession.fromJson(data);
       if (session.questionsSnapshot.isEmpty) {
-        throw GameFunctionsException('failed-precondition', 'NO_QUESTIONS_AVAILABLE');
+        throw GameFunctionsException('failed-precondition', 'NO_QUESTIONS_EXIST_FOR_TOPIC');
       }
       return session;
     } on FirebaseFunctionsException catch (error) {
