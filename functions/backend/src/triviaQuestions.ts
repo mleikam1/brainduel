@@ -220,21 +220,17 @@ export async function generateTriviaPack(
     createdBy: string;
   }
 ): Promise<TriviaPackGenerationResult> {
-  const resolved = await resolveTopicId(db, options.topicId);
+  const trimmedTopicId = options.topicId.trim();
+  if (!trimmedTopicId) {
+    throw new HttpsError("invalid-argument", "Missing topicId");
+  }
   const questionResult = await getRandomQuestionsForTopic(db, {
-    topicId: resolved.canonicalTopicId,
+    topicId: trimmedTopicId,
     limit: options.questionCount,
   });
   const questionDocs = questionResult.docs;
   if (questionDocs.length === 0) {
-    throw new HttpsError(
-      "failed-precondition",
-      "NO_QUESTIONS_EXIST_FOR_TOPIC",
-      {
-        code: "NO_QUESTIONS_EXIST_FOR_TOPIC",
-        topic: resolved.canonicalTopicId,
-      }
-    );
+    throw new HttpsError("failed-precondition", "No questions available");
   }
 
   const selectedDocs = questionDocs;
@@ -243,7 +239,7 @@ export async function generateTriviaPack(
   const packRef = db.collection("trivia_packs").doc();
   await packRef.set({
     id: packRef.id,
-    topicId: resolved.canonicalTopicId,
+    topicId: trimmedTopicId,
     questionIds,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     createdBy: options.createdBy,
@@ -251,11 +247,11 @@ export async function generateTriviaPack(
 
   return {
     packId: packRef.id,
-    topicId: resolved.canonicalTopicId,
+    topicId: trimmedTopicId,
     questionIds,
     questionDocs: selectedDocs,
     appliedFilter: "topicId",
-    appliedValue: resolved.canonicalTopicId,
+    appliedValue: trimmedTopicId,
     totalQuestions: questionResult.totalQuestions,
   };
 }
