@@ -154,13 +154,7 @@ class QuizController extends StateNotifier<TriviaGameState> {
         if (details.contains('no_questions_exist_for_topic')) {
           return 'No questions are available for this category yet. Please try another.';
         }
-        if (details.contains('user') && details.contains('document')) {
-          return 'Your account is still getting set up. Please try again shortly.';
-        }
-        if (details.contains('pack') || details.contains('topic') || details.contains('category')) {
-          return 'This game is not available right now.';
-        }
-        return 'This game is not ready yet. Please try again in a moment.';
+        return 'Unable to start game. Please try again.';
       case 'not-found':
         return 'That game could not be found.';
       default:
@@ -180,13 +174,7 @@ class QuizController extends StateNotifier<TriviaGameState> {
         if (details.contains('no_questions_exist_for_topic')) {
           return 'No questions are available for this category yet. Please try another.';
         }
-        if (details.contains('user') && details.contains('document')) {
-          return 'Your account is still getting set up. Please try again shortly.';
-        }
-        if (details.contains('pack') || details.contains('topic') || details.contains('category')) {
-          return 'This game is not available right now.';
-        }
-        return 'This game is not ready yet. Please try again in a moment.';
+        return 'Unable to start game. Please try again.';
       case 'not-found':
         return 'That game could not be found.';
       default:

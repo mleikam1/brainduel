@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -30,44 +29,11 @@ class GameFunctionsService {
       };
       final result = await callable.call(payload);
       final data = _requireMap(result.data, 'createGame');
-      final rawQuestions = data['questionsSnapshot'] ?? data['questions'];
-      if (rawQuestions is! List || rawQuestions.isEmpty) {
-        throw GameFunctionsException('failed-precondition', 'NO_QUESTIONS_EXIST_FOR_TOPIC');
-      }
       final session = GameSession.fromJson(data);
-      if (session.questionsSnapshot.isEmpty) {
-        throw GameFunctionsException('failed-precondition', 'NO_QUESTIONS_EXIST_FOR_TOPIC');
-      }
       return session;
     } on FirebaseFunctionsException catch (error) {
       _logCallableError('createGame', error);
       throw GameFunctionsException.fromFirebase(error);
-    }
-  }
-
-  Future<int> fetchQuestionCountForTopic(String topicId) async {
-    final trimmedTopicId = topicId.trim();
-    if (trimmedTopicId.isEmpty) {
-      return 0;
-    }
-    try {
-      final aggregate = await FirebaseFirestore.instance
-          .collection('questions')
-          .where('topicId', isEqualTo: trimmedTopicId)
-          .count()
-          .get();
-      final count = aggregate.count ?? 0;
-      if (count > 0) {
-        return count;
-      }
-      final fallbackAggregate = await FirebaseFirestore.instance
-          .collection('questions')
-          .where('categoryId', isEqualTo: trimmedTopicId)
-          .count()
-          .get();
-      return fallbackAggregate.count ?? 0;
-    } catch (_) {
-      return 0;
     }
   }
 

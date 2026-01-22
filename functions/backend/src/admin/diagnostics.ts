@@ -3,7 +3,6 @@ import { logger } from "firebase-functions/logger";
 import * as admin from "firebase-admin";
 import {
   buildTopicCandidates,
-  QUESTION_FIELDS,
   resolveTopicId,
 } from "../triviaQuestions";
 
@@ -82,7 +81,7 @@ async function runDiagnostics(request: {
     count: number;
   }> = [];
 
-  for (const field of QUESTION_FIELDS) {
+  for (const field of ["topicId"] as const) {
     for (const value of candidateValues) {
       const [rootCount, groupCount] = await Promise.all([
         db.collection("questions").where(field, "==", value).count().get(),
@@ -113,7 +112,7 @@ async function runDiagnostics(request: {
 
   const samples: Record<string, string[]> = {};
   const sampleDocs: FirebaseFirestore.QueryDocumentSnapshot[] = [];
-  for (const field of QUESTION_FIELDS) {
+  for (const field of ["topicId"] as const) {
     const attempt = rootAttempts.find(
       (entry) => entry.field === field && entry.count > 0
     );
