@@ -3,11 +3,10 @@ import { logger } from "firebase-functions/logger";
 import * as admin from "firebase-admin";
 import { emitQuizAnalyticsEvent } from "./analytics";
 import {
-  getQuestionsForTopic,
   resolveTopicId,
   buildTopicCandidates,
-  QUESTION_FIELDS,
   generateTriviaPack,
+  getRandomQuestionsForTopic,
 } from "./triviaQuestions";
 
 admin.initializeApp();
@@ -147,12 +146,6 @@ export const createGame = onCall(async (request) => {
   let packTopicId: string | undefined;
   let packQuestionIds: string[] | undefined;
   let packIssues: string[] = [];
-  let queryAttempts: {
-    field: string;
-    value: string;
-    count: number;
-  }[] = [];
-  let queryLimit = 0;
   let triviaPackRefId: string | undefined;
 
   if (typeof triviaPackId === "string" && triviaPackId.trim()) {
@@ -233,8 +226,6 @@ export const createGame = onCall(async (request) => {
     });
     questionDocs = packResult.questionDocs;
     appliedFilter = packResult.appliedFilter;
-    queryAttempts = packResult.attempts;
-    queryLimit = packResult.queryLimit;
     triviaPackRefId = packResult.packId;
   }
 
@@ -247,8 +238,6 @@ export const createGame = onCall(async (request) => {
       resolvedFrom: resolved.resolvedFrom,
       mappingIssues: resolved.mappingIssues,
       appliedFilter,
-      queryLimit,
-      queryAttempts,
       packIssues,
     });
     throw new HttpsError(
@@ -264,13 +253,10 @@ export const createGame = onCall(async (request) => {
         mappingIssues: resolved.mappingIssues,
         totalQuestions: 0,
         collection: "questions",
-        fieldsTested: QUESTION_FIELDS,
         candidateValues: buildTopicCandidates({
           ...resolved,
           canonicalTopicId: packTopicId ?? canonicalTopicId,
         }),
-        queryAttempts,
-        queryLimit,
         appliedFilter,
         triviaPackId,
         packIssues,
@@ -470,12 +456,11 @@ export const createSharedQuiz = onCall(async (request) => {
       );
     }
   } else {
-    const queryResult = await getQuestionsForTopic(db, {
-      resolved,
-      count: quizSize,
-      limit: 500,
+    const questionResult = await getRandomQuestionsForTopic(db, {
+      topicId: resolved.canonicalTopicId,
+      limit: quizSize,
     });
-    const questionDocs = queryResult.docs;
+    const questionDocs = questionResult.docs;
     if (questionDocs.length === 0) {
       throw new HttpsError(
         "failed-precondition",
@@ -490,18 +475,15 @@ export const createSharedQuiz = onCall(async (request) => {
           mappingIssues: resolved.mappingIssues,
           totalQuestions: 0,
           collection: "questions",
-          fieldsTested: QUESTION_FIELDS,
           candidateValues: buildTopicCandidates(resolved),
-          queryAttempts: queryResult.attempts,
-          queryLimit: queryResult.queryLimit,
-          appliedFilter: queryResult.appliedFilter,
+          appliedFilter: "topicId",
         }
       );
     }
 
     const poolIds = questionDocs.map((doc) => doc.id);
-    poolSize = poolIds.length;
-    if (poolSize < quizSize) {
+    poolSize = questionResult.totalQuestions;
+    if (questionResult.totalQuestions < quizSize) {
       throw new HttpsError(
         "failed-precondition",
         "Not enough questions to create shared quiz"

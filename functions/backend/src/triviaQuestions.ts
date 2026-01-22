@@ -1,16 +1,6 @@
 import { HttpsError } from "firebase-functions/v2/https";
-import { logger } from "firebase-functions/logger";
 import * as admin from "firebase-admin";
 import type { FirebaseFirestore } from "firebase-admin";
-
-export const QUESTION_FIELDS = [
-  "topicId",
-  "categoryId",
-  "topic",
-  "category",
-] as const;
-
-export type QuestionField = (typeof QUESTION_FIELDS)[number];
 
 export interface TopicResolution {
   canonicalTopicId: string;
@@ -23,21 +13,11 @@ export interface TopicResolution {
   normalizedTopicId: string;
 }
 
-export interface QuestionQueryAttempt {
-  field: QuestionField;
-  value: string;
-  count: number;
-}
-
 export interface QuestionFetchResult {
   docs: FirebaseFirestore.QueryDocumentSnapshot[];
-  appliedFilter: string;
-  appliedValue?: string;
-  attempts: QuestionQueryAttempt[];
-  candidateValues: string[];
-  fieldsTested: QuestionField[];
-  queryLimit: number;
-  collection: string;
+  questionIds: string[];
+  totalQuestions: number;
+  topicId: string;
 }
 
 export interface TriviaPackGenerationResult {
@@ -48,8 +28,6 @@ export interface TriviaPackGenerationResult {
   appliedFilter: string;
   appliedValue?: string;
   totalQuestions: number;
-  attempts: QuestionQueryAttempt[];
-  queryLimit: number;
 }
 
 export function normalizeTopicKey(value: string): string {
@@ -190,59 +168,6 @@ export async function resolveTopicId(
   };
 }
 
-export async function getQuestionsForTopic(
-  db: FirebaseFirestore.Firestore,
-  options: {
-    resolved: TopicResolution;
-    count: number;
-    limit?: number;
-  }
-): Promise<QuestionFetchResult> {
-  const { resolved, count, limit } = options;
-  const candidateValues = buildTopicCandidates(resolved);
-  const fieldsTested = [...QUESTION_FIELDS];
-  const queryLimit = Math.max(limit ?? count * 6, count);
-  const attempts: QuestionQueryAttempt[] = [];
-
-  for (const field of fieldsTested) {
-    for (const value of candidateValues) {
-      const query = db.collection("questions").where(field, "==", value);
-      const countSnap = await query.count().get();
-      const total = countSnap.data().count;
-      attempts.push({ field, value, count: total });
-      logger.info("question query attempt", {
-        field,
-        value,
-        count: total,
-        limit: queryLimit,
-      });
-      if (total > 0) {
-        const docsSnap = await query.limit(queryLimit).get();
-        return {
-          docs: docsSnap.docs,
-          appliedFilter: field,
-          appliedValue: value,
-          attempts,
-          candidateValues,
-          fieldsTested,
-          queryLimit,
-          collection: "questions",
-        };
-      }
-    }
-  }
-
-  return {
-    docs: [],
-    appliedFilter: "none",
-    attempts,
-    candidateValues,
-    fieldsTested,
-    queryLimit,
-    collection: "questions",
-  };
-}
-
 function shuffleInPlace<T>(items: T[]): T[] {
   for (let i = items.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -251,65 +176,40 @@ function shuffleInPlace<T>(items: T[]): T[] {
   return items;
 }
 
-async function findQuestionQueryForTopic(
+export async function getRandomQuestionsForTopic(
   db: FirebaseFirestore.Firestore,
-  resolved: TopicResolution,
-  count: number
-): Promise<{
-  query: FirebaseFirestore.Query;
-  appliedFilter: string;
-  appliedValue: string;
-  attempts: QuestionQueryAttempt[];
-  queryLimit: number;
-}> {
-  const candidateValues = buildTopicCandidates(resolved);
-  const fieldsTested = [...QUESTION_FIELDS];
-  const queryLimit = Math.max(count * 6, count);
-  const attempts: QuestionQueryAttempt[] = [];
-
-  for (const field of fieldsTested) {
-    for (const value of candidateValues) {
-      const query = db.collection("questions").where(field, "==", value);
-      const countSnap = await query.count().get();
-      const total = countSnap.data().count;
-      attempts.push({ field, value, count: total });
-      logger.info("question query attempt", {
-        field,
-        value,
-        count: total,
-        limit: queryLimit,
-      });
-      if (total > 0) {
-        return {
-          query,
-          appliedFilter: field,
-          appliedValue: value,
-          attempts,
-          queryLimit,
-        };
-      }
-    }
+  options: {
+    topicId: string;
+    limit?: number;
   }
-
-  throw new HttpsError(
-    "failed-precondition",
-    "NO_QUESTIONS_EXIST_FOR_TOPIC",
-    {
-      code: "NO_QUESTIONS_EXIST_FOR_TOPIC",
-      topic: resolved.canonicalTopicId,
-      inputTopicId: resolved.inputTopicId,
-      inputCategoryId: resolved.inputCategoryId,
-      inputTopic: resolved.inputTopic,
-      resolvedFrom: resolved.resolvedFrom,
-      mappingIssues: resolved.mappingIssues,
-      totalQuestions: 0,
-      collection: "questions",
-      fieldsTested,
-      candidateValues,
-      queryLimit,
-      attempts,
-    }
-  );
+): Promise<QuestionFetchResult> {
+  const { topicId, limit } = options;
+  // Questions are stored with string topicId/categoryId fields; query only topicId for gameplay selection.
+  const querySnap = await db
+    .collection("questions")
+    .where("topicId", "==", topicId)
+    .get();
+  const allDocs = querySnap.docs;
+  const totalQuestions = allDocs.length;
+  if (totalQuestions === 0) {
+    return {
+      docs: [],
+      questionIds: [],
+      totalQuestions,
+      topicId,
+    };
+  }
+  const shuffledDocs = shuffleInPlace([...allDocs]);
+  const selectedDocs =
+    typeof limit === "number" && limit > 0 && limit < shuffledDocs.length
+      ? shuffledDocs.slice(0, limit)
+      : shuffledDocs;
+  return {
+    docs: selectedDocs,
+    questionIds: selectedDocs.map((doc) => doc.id),
+    totalQuestions,
+    topicId,
+  };
 }
 
 export async function generateTriviaPack(
@@ -321,14 +221,11 @@ export async function generateTriviaPack(
   }
 ): Promise<TriviaPackGenerationResult> {
   const resolved = await resolveTopicId(db, options.topicId);
-  const queryResult = await findQuestionQueryForTopic(
-    db,
-    resolved,
-    options.questionCount
-  );
-
-  const questionSnap = await queryResult.query.get();
-  const questionDocs = questionSnap.docs;
+  const questionResult = await getRandomQuestionsForTopic(db, {
+    topicId: resolved.canonicalTopicId,
+    limit: options.questionCount,
+  });
+  const questionDocs = questionResult.docs;
   if (questionDocs.length === 0) {
     throw new HttpsError(
       "failed-precondition",
@@ -340,11 +237,7 @@ export async function generateTriviaPack(
     );
   }
 
-  const shuffledDocs = shuffleInPlace([...questionDocs]);
-  const selectedDocs =
-    options.questionCount >= shuffledDocs.length
-      ? shuffledDocs
-      : shuffledDocs.slice(0, options.questionCount);
+  const selectedDocs = questionDocs;
   const questionIds = selectedDocs.map((doc) => doc.id);
 
   const packRef = db.collection("trivia_packs").doc();
@@ -361,10 +254,8 @@ export async function generateTriviaPack(
     topicId: resolved.canonicalTopicId,
     questionIds,
     questionDocs: selectedDocs,
-    appliedFilter: queryResult.appliedFilter,
-    appliedValue: queryResult.appliedValue,
-    totalQuestions: questionDocs.length,
-    attempts: queryResult.attempts,
-    queryLimit: queryResult.queryLimit,
+    appliedFilter: "topicId",
+    appliedValue: resolved.canonicalTopicId,
+    totalQuestions: questionResult.totalQuestions,
   };
 }
