@@ -17,12 +17,15 @@ const db = admin.firestore();
  */
 interface QuestionDoc {
   id: string;
+  topicId: string;
+  categoryId: string;
   prompt: string;
   choices: string[];
   correctIndex: number;
-  difficulty?: string;
-  topicId: string;
+  difficulty: string;
   active: boolean;
+  createdAt: admin.firestore.Timestamp;
+  updatedAt: admin.firestore.Timestamp;
 }
 
 interface SharedQuizSnapshotQuestion {
@@ -435,9 +438,10 @@ export const createSharedQuiz = onCall(async (request) => {
     poolSize = existingDocs.length;
     const mismatched = existingDocs.filter((doc) => {
       const data = doc.data() as QuestionDoc;
+      const docTopicId = data.topicId ?? data.categoryId;
       return (
-        data.topicId !== resolved.canonicalTopicId &&
-        data.topicId !== resolved.inputCategoryId
+        docTopicId !== resolved.canonicalTopicId &&
+        docTopicId !== resolved.inputCategoryId
       );
     });
     if (mismatched.length > 0) {
