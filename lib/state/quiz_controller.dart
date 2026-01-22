@@ -6,10 +6,8 @@ import '../services/analytics_service.dart';
 import '../services/game_functions_service.dart';
 import '../services/quiz_analytics.dart';
 import '../services/quiz_repository.dart';
-import '../services/local_solo_game_service.dart';
 import 'auth_provider.dart';
 import 'categories_provider.dart';
-import 'category_progress_provider.dart';
 
 enum QuestionPhase {
   reading,
@@ -153,7 +151,7 @@ class QuizController extends StateNotifier<TriviaGameState> {
         return 'Please sign in to continue.';
       case 'failed-precondition':
         final details = _formatErrorDetails(error.message, error.details);
-        if (details.contains('no_questions_available')) {
+        if (details.contains('no_questions_exist_for_topic')) {
           return 'No questions are available for this category yet. Please try another.';
         }
         if (details.contains('user') && details.contains('document')) {
@@ -179,7 +177,7 @@ class QuizController extends StateNotifier<TriviaGameState> {
         return 'Please sign in to continue.';
       case 'failed-precondition':
         final details = _formatErrorDetails(error.message, error.details);
-        if (details.contains('no_questions_available')) {
+        if (details.contains('no_questions_exist_for_topic')) {
           return 'No questions are available for this category yet. Please try another.';
         }
         if (details.contains('user') && details.contains('document')) {
@@ -270,11 +268,11 @@ class QuizController extends StateNotifier<TriviaGameState> {
   bool _isNoQuestionsError(Object error) {
     if (error is QuizRepositoryException) {
       return _formatErrorDetails(error.message, error.details)
-          .contains('no_questions_available');
+          .contains('no_questions_exist_for_topic');
     }
     if (error is GameFunctionsException) {
       return _formatErrorDetails(error.message, error.details)
-          .contains('no_questions_available');
+          .contains('no_questions_exist_for_topic');
     }
     return false;
   }
@@ -310,23 +308,6 @@ class QuizController extends StateNotifier<TriviaGameState> {
     });
   }
 
-  void _logCategoryExhaustedIfNeeded(GameSession session) {
-    final meta = session.selectionMeta;
-    if (meta == null || !meta.exhaustedThisPick || meta.weekKey.isEmpty) {
-      return;
-    }
-    final progressMap = ref.read(categoryProgressMapProvider).asData?.value;
-    final exhaustedCount = progressMap?[session.topicId]?.exhaustedCount ?? 1;
-    _logOnce('category_exhausted:${session.topicId}:${session.gameId}', () {
-      _quizAnalytics.logCategoryExhausted(
-        categoryId: session.topicId,
-        poolSize: meta.poolSize,
-        exhaustedCount: exhaustedCount,
-        weekKey: meta.weekKey,
-      );
-    });
-  }
-
   void _logQuizSharedCreated({
     required String categoryId,
     required String quizId,
@@ -337,20 +318,6 @@ class QuizController extends StateNotifier<TriviaGameState> {
         quizId: quizId,
       );
     });
-  }
-
-  bool _validateQuestionCount(GameSession session, {String modeLabel = 'Solo matches'}) {
-    if (session.questionsSnapshot.length < kMinimumSoloQuestionCount) {
-      state = state.copyWith(
-        loading: false,
-        error:
-            '$modeLabel need at least $kMinimumSoloQuestionCount questions '
-            '(received ${session.questionsSnapshot.length}).',
-      );
-      _logGameFailed('start', code: 'insufficient-questions');
-      return false;
-    }
-    return true;
   }
 
   Future<void> startGame(String categoryId) async {
@@ -385,21 +352,11 @@ class QuizController extends StateNotifier<TriviaGameState> {
         _logGameFailed('start', code: 'category-unavailable');
         return;
       }
-      final packId = await ref.read(categoryPackIdProvider(trimmedCategoryId).future);
-      if (packId.trim().isEmpty) {
-        state = _markGameStartFailure('That trivia pack is not available right now.');
-        _logGameFailed('start', code: 'pack-unavailable');
-        return;
-      }
       final analytics = ref.read(analyticsServiceProvider);
       final session = await ref.read(gameFunctionsServiceProvider).createGame(
             topicId: trimmedCategoryId,
-            triviaPackId: packId,
             mode: 'solo',
           );
-      if (!_validateQuestionCount(session, modeLabel: 'Solo matches')) {
-        return;
-      }
       // Fairness requires server-generated question snapshots so clients cannot reshuffle or peek at answers.
       if (_completedGameIds.contains(session.gameId)) {
         state = state.copyWith(
@@ -412,7 +369,6 @@ class QuizController extends StateNotifier<TriviaGameState> {
 
       analytics.logEvent('trivia_game_started', parameters: {
         'topicId': trimmedCategoryId,
-        'packId': packId,
         'mode': 'solo',
         'gameId': session.gameId,
         'source': 'category',
@@ -420,7 +376,6 @@ class QuizController extends StateNotifier<TriviaGameState> {
 
       _activeMode = 'solo';
       _logQuizStarted(session, mode: 'solo');
-      _logCategoryExhaustedIfNeeded(session);
 
       _selectedIndexByQuestionId.clear();
       state = TriviaGameState.initial().copyWith(
@@ -476,9 +431,6 @@ class QuizController extends StateNotifier<TriviaGameState> {
       final gameFunctions = ref.read(gameFunctionsServiceProvider);
       final analytics = ref.read(analyticsServiceProvider);
       final session = await gameFunctions.loadGame(gameId);
-      if (!_validateQuestionCount(session, modeLabel: 'Shared games')) {
-        return;
-      }
       if (_completedGameIds.contains(session.gameId)) {
         state = state.copyWith(
           loading: false,
@@ -547,9 +499,6 @@ class QuizController extends StateNotifier<TriviaGameState> {
       final gameFunctions = ref.read(gameFunctionsServiceProvider);
       final analytics = ref.read(analyticsServiceProvider);
       final session = await gameFunctions.getSharedQuiz(trimmedQuizId);
-      if (!_validateQuestionCount(session, modeLabel: 'Shared quizzes')) {
-        return;
-      }
       if (_completedGameIds.contains(session.gameId)) {
         state = state.copyWith(
           loading: false,

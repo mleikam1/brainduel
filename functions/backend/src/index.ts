@@ -7,6 +7,7 @@ import {
   resolveTopicId,
   buildTopicCandidates,
   QUESTION_FIELDS,
+  generateTriviaPack,
 } from "./triviaQuestions";
 
 admin.initializeApp();
@@ -23,13 +24,6 @@ interface QuestionDoc {
   difficulty?: string;
   topicId: string;
   active: boolean;
-}
-
-interface CategoryProgress {
-  seed: string;
-  cursor: number;
-  exhaustedCount: number;
-  weekKey: string;
 }
 
 interface SharedQuizSnapshotQuestion {
@@ -136,10 +130,6 @@ export const createGame = onCall(async (request) => {
   }
   const resolved = await resolveTopicId(db, topicId, categoryId, topic);
   const canonicalTopicId = resolved.canonicalTopicId;
-  const progressRef = db.doc(
-    `users/${uid}/categoryProgress/${canonicalTopicId}`
-  );
-
   if (resolved.mappingIssues.length > 0) {
     logger.warn("createGame topic resolution issues", {
       topicId: canonicalTopicId,
@@ -163,6 +153,7 @@ export const createGame = onCall(async (request) => {
     count: number;
   }[] = [];
   let queryLimit = 0;
+  let triviaPackRefId: string | undefined;
 
   if (typeof triviaPackId === "string" && triviaPackId.trim()) {
     const packSnap = await db.doc(`trivia_packs/${triviaPackId}`).get();
@@ -206,21 +197,45 @@ export const createGame = onCall(async (request) => {
     if (questionDocs.length !== packQuestionIds.length) {
       packIssues.push("pack contains missing questions");
     }
+    triviaPackRefId = triviaPackId;
+    if (packIssues.length > 0) {
+      throw new HttpsError(
+        "failed-precondition",
+        "TRIVIA_PACK_INVALID",
+        {
+          code: "TRIVIA_PACK_INVALID",
+          triviaPackId,
+          packIssues,
+        }
+      );
+    }
   } else {
+    if (typeof triviaPackId === "string" && triviaPackId.trim()) {
+      throw new HttpsError(
+        "failed-precondition",
+        "TRIVIA_PACK_INVALID",
+        {
+          code: "TRIVIA_PACK_INVALID",
+          triviaPackId,
+          packIssues,
+        }
+      );
+    }
     const selectionSize = 10;
     const queryResolved = {
       ...resolved,
       canonicalTopicId: packTopicId ?? canonicalTopicId,
     };
-    const queryResult = await getQuestionsForTopic(db, {
-      resolved: queryResolved,
-      count: selectionSize,
-      limit: selectionSize * 6,
+    const packResult = await generateTriviaPack(db, {
+      topicId: queryResolved.canonicalTopicId,
+      questionCount: selectionSize,
+      createdBy: uid,
     });
-    questionDocs = queryResult.docs;
-    appliedFilter = queryResult.appliedFilter;
-    queryAttempts = queryResult.attempts;
-    queryLimit = queryResult.queryLimit;
+    questionDocs = packResult.questionDocs;
+    appliedFilter = packResult.appliedFilter;
+    queryAttempts = packResult.attempts;
+    queryLimit = packResult.queryLimit;
+    triviaPackRefId = packResult.packId;
   }
 
   if (questionDocs.length === 0) {
@@ -238,9 +253,9 @@ export const createGame = onCall(async (request) => {
     });
     throw new HttpsError(
       "failed-precondition",
-      "NO_QUESTIONS_AVAILABLE",
+      "NO_QUESTIONS_EXIST_FOR_TOPIC",
       {
-        code: "NO_QUESTIONS_AVAILABLE",
+        code: "NO_QUESTIONS_EXIST_FOR_TOPIC",
         topic: canonicalTopicId,
         inputTopicId: resolved.inputTopicId,
         inputCategoryId: resolved.inputCategoryId,
@@ -272,116 +287,9 @@ export const createGame = onCall(async (request) => {
   });
 
   const gameId = db.collection("games").doc().id;
-  const progressSnap = await progressRef.get();
-
-  const weekKey = isoWeekKey();
-  const progressData = progressSnap.data() as
-    | Partial<CategoryProgress>
-    | undefined;
-  const progressWeekKey = progressData?.weekKey;
-  const isSameWeek = progressWeekKey === weekKey;
-  const seed =
-    isSameWeek && typeof progressData?.seed === "string"
-      ? progressData.seed
-      : `${uid}-${canonicalTopicId}-${weekKey}`;
-  const existingCursor = Number.isInteger(progressData?.cursor)
-    ? (progressData!.cursor as number)
-    : 0;
-  const cursorStart = isSameWeek ? existingCursor : 0;
-  const existingExhausted = Number.isInteger(progressData?.exhaustedCount)
-    ? (progressData!.exhaustedCount as number)
-    : 0;
-  const exhaustedBase = isSameWeek ? existingExhausted : 0;
-
   const poolSize = allQuestions.length;
-  if (poolSize < 10) {
-    logger.warn("createGame insufficient question pool", {
-      topicId: canonicalTopicId,
-      poolSize,
-      appliedFilter,
-      queryAttempts,
-      queryLimit,
-    });
-    throw new HttpsError(
-      "failed-precondition",
-      "Not enough questions to create game",
-      {
-        code: "NO_QUESTIONS_AVAILABLE",
-        topicId: canonicalTopicId,
-        inputTopicId: resolved.inputTopicId,
-        inputCategoryId: resolved.inputCategoryId,
-        resolvedFrom: resolved.resolvedFrom,
-        mappingIssues: resolved.mappingIssues,
-        poolSize,
-        appliedFilter,
-        questionCount: questionDocs.length,
-        fieldsTested: QUESTION_FIELDS,
-        candidateValues: buildTopicCandidates({
-          ...resolved,
-          canonicalTopicId: packTopicId ?? canonicalTopicId,
-        }),
-        queryAttempts,
-        queryLimit,
-        triviaPackId,
-        packIssues,
-      }
-    );
-  }
-
-  const shuffled = seededShuffle(allQuestions, seed);
-  const cursorBefore = ((cursorStart % poolSize) + poolSize) % poolSize;
-  const selectionSize = 10;
-  const end = cursorBefore + selectionSize;
-  let selected: QuestionDoc[] = [];
-  let cursorAfter = 0;
-  let exhaustedThisPick = false;
-  if (end <= poolSize) {
-    selected = shuffled.slice(cursorBefore, end);
-    cursorAfter = end === poolSize ? 0 : end;
-    exhaustedThisPick = end === poolSize;
-  } else {
-    selected = [
-      ...shuffled.slice(cursorBefore),
-      ...shuffled.slice(0, end - poolSize),
-    ];
-    cursorAfter = end - poolSize;
-    exhaustedThisPick = true;
-  }
-
-  if (selected.length < 10) {
-    logger.warn("createGame selection too small", {
-      topicId: canonicalTopicId,
-      selectedCount: selected.length,
-      poolSize,
-      appliedFilter,
-      queryAttempts,
-      queryLimit,
-    });
-    throw new HttpsError(
-      "failed-precondition",
-      "Not enough questions to create game",
-      {
-        code: "NO_QUESTIONS_AVAILABLE",
-        topicId: canonicalTopicId,
-        inputTopicId: resolved.inputTopicId,
-        inputCategoryId: resolved.inputCategoryId,
-        resolvedFrom: resolved.resolvedFrom,
-        mappingIssues: resolved.mappingIssues,
-        poolSize,
-        appliedFilter,
-        questionCount: questionDocs.length,
-        fieldsTested: QUESTION_FIELDS,
-        candidateValues: buildTopicCandidates({
-          ...resolved,
-          canonicalTopicId: packTopicId ?? canonicalTopicId,
-        }),
-        queryAttempts,
-        queryLimit,
-        triviaPackId,
-        packIssues,
-      }
-    );
-  }
+  const selected: QuestionDoc[] = allQuestions;
+  const selectionSize = selected.length;
 
   logger.info("createGame question selection", {
     topicId: canonicalTopicId,
@@ -405,14 +313,14 @@ export const createGame = onCall(async (request) => {
 
   batch.set(gameRef, {
     gameId,
-    topicId: canonicalTopicId,
-    categoryId: resolved.inputCategoryId ?? canonicalTopicId,
+    topicId: packTopicId ?? canonicalTopicId,
+    categoryId: resolved.inputCategoryId ?? packTopicId ?? canonicalTopicId,
     createdByUid: uid,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     status: "open",
     questionIds: selected.map((q) => q.id),
     questionsSnapshot,
-    triviaPackId: triviaPackId ?? null,
+    triviaPackId: triviaPackRefId ?? null,
   });
 
   batch.set(playerRef, {
@@ -421,57 +329,24 @@ export const createGame = onCall(async (request) => {
     locked: false,
   });
 
-  batch.set(
-    progressRef,
-    {
-      seed,
-      cursor: cursorAfter,
-      exhaustedCount: exhaustedBase + (exhaustedThisPick ? 1 : 0),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      weekKey,
-    },
-    { merge: true }
-  );
-
   await batch.commit();
 
-  const exhaustedCount =
-    exhaustedBase + (exhaustedThisPick ? 1 : 0);
-
   emitQuizAnalyticsEvent("quiz_started", {
-    categoryId: canonicalTopicId,
+    categoryId: packTopicId ?? canonicalTopicId,
     quizSize: selectionSize,
     poolSize,
-    exhaustedCount,
-    weekKey,
+    exhaustedCount: 0,
+    weekKey: isoWeekKey(),
     mode: "solo",
     quizId: gameId,
   });
 
-  if (exhaustedThisPick) {
-    emitQuizAnalyticsEvent("category_exhausted", {
-      categoryId: canonicalTopicId,
-      quizSize: selectionSize,
-      poolSize,
-      exhaustedCount,
-      weekKey,
-      mode: "solo",
-      quizId: gameId,
-    });
-  }
-
   return {
     gameId,
-    topicId: canonicalTopicId,
-    categoryId: resolved.inputCategoryId ?? canonicalTopicId,
+    topicId: packTopicId ?? canonicalTopicId,
+    categoryId: resolved.inputCategoryId ?? packTopicId ?? canonicalTopicId,
     questionsSnapshot,
-    selectionMeta: {
-      exhaustedThisPick,
-      poolSize,
-      cursorBefore,
-      cursorAfter,
-      weekKey,
-    },
+    triviaPackId: triviaPackRefId ?? null,
   };
 });
 
@@ -604,9 +479,9 @@ export const createSharedQuiz = onCall(async (request) => {
     if (questionDocs.length === 0) {
       throw new HttpsError(
         "failed-precondition",
-        "NO_QUESTIONS_AVAILABLE",
+        "NO_QUESTIONS_EXIST_FOR_TOPIC",
         {
-          code: "NO_QUESTIONS_AVAILABLE",
+          code: "NO_QUESTIONS_EXIST_FOR_TOPIC",
           topic: resolved.canonicalTopicId,
           inputTopicId: resolved.inputTopicId,
           inputCategoryId: resolved.inputCategoryId,
@@ -832,17 +707,6 @@ export const completeGame = onCall(async (request) => {
     };
   });
 
-  const topicStatsRef = db.doc(`users/${uid}/topicStats/${topicId}`);
-  const topicStatsSnap = await topicStatsRef.get();
-
-  const existingSeen: string[] =
-    topicStatsSnap.exists &&
-    Array.isArray(topicStatsSnap.data()?.seenQuestionIds)
-      ? topicStatsSnap.data()!.seenQuestionIds
-      : [];
-
-  const updatedSeen = [...existingSeen, ...questionIds].slice(-200);
-
   const batch = db.batch();
 
   batch.update(playerRef, {
@@ -853,41 +717,14 @@ export const completeGame = onCall(async (request) => {
     locked: true,
   });
 
-  batch.set(
-    topicStatsRef,
-    {
-      seenQuestionIds: updatedSeen,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    },
-    { merge: true }
-  );
-
   await batch.commit();
 
-  const progressRef = db.doc(
-    `users/${uid}/categoryProgress/${topicId}`
-  );
-
   void (async () => {
-    const progressSnap = await progressRef.get();
-    const progressData = progressSnap.data() as
-      | Partial<CategoryProgress>
-      | undefined;
-    const exhaustedCount = Number.isInteger(
-      progressData?.exhaustedCount
-    )
-      ? (progressData!.exhaustedCount as number)
-      : 0;
-    const weekKey =
-      typeof progressData?.weekKey === "string"
-        ? progressData.weekKey
-        : isoWeekKey();
-
     emitQuizAnalyticsEvent("quiz_completed", {
       categoryId: topicId,
       quizSize: questionIds.length,
-      exhaustedCount,
-      weekKey,
+      exhaustedCount: 0,
+      weekKey: isoWeekKey(),
       mode: "solo",
       quizId: gameId,
     });

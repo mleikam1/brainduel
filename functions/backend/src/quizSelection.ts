@@ -1,25 +1,12 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
-import { emitQuizAnalyticsEvent } from "./analytics";
-import {
-  buildTopicCandidates,
-  getQuestionsForTopic,
-  QUESTION_FIELDS,
-  resolveTopicId,
-} from "./triviaQuestions";
+import { resolveTopicId, generateTriviaPack } from "./triviaQuestions";
 
 if (!admin.apps.length) {
   admin.initializeApp();
 }
 
 const db = admin.firestore();
-
-interface CategoryProgress {
-  seed: string;
-  cursor: number;
-  exhaustedCount: number;
-  weekKey: string;
-}
 
 interface QuizSelectionResponse {
   questionIds: string[];
@@ -30,22 +17,6 @@ interface QuizSelectionResponse {
     cursorAfter: number;
     poolSize: number;
   };
-}
-
-function seededShuffle<T>(items: T[], seed: string): T[] {
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) {
-    hash = (hash << 5) - hash + seed.charCodeAt(i);
-    hash |= 0;
-  }
-
-  const result = [...items];
-  for (let i = result.length - 1; i > 0; i--) {
-    hash = (hash * 9301 + 49297) % 233280;
-    const j = Math.abs(hash) % (i + 1);
-    [result[i], result[j]] = [result[j], result[i]];
-  }
-  return result;
 }
 
 function isoWeekKey(date: Date = new Date()): string {
@@ -84,128 +55,21 @@ export const selectQuizQuestions = onCall(async (request) => {
 
   const resolved = await resolveTopicId(db, topicId, categoryId, topic);
   const canonicalTopicId = resolved.canonicalTopicId;
-  const progressRef = db.doc(
-    `users/${uid}/categoryProgress/${canonicalTopicId}`
-  );
-  const weekKey = isoWeekKey();
-
-  const [progressSnap, questionResult] = await Promise.all([
-    progressRef.get(),
-    getQuestionsForTopic(db, {
-      resolved,
-      count: quizSize,
-      limit: 500,
-    }),
-  ]);
-
-  if (questionResult.docs.length === 0) {
-    throw new HttpsError(
-      "failed-precondition",
-      "NO_QUESTIONS_AVAILABLE",
-      {
-        code: "NO_QUESTIONS_AVAILABLE",
-        topic: canonicalTopicId,
-        inputTopicId: resolved.inputTopicId,
-        inputCategoryId: resolved.inputCategoryId,
-        inputTopic: resolved.inputTopic,
-        resolvedFrom: resolved.resolvedFrom,
-        mappingIssues: resolved.mappingIssues,
-        totalQuestions: 0,
-        collection: "questions",
-        fieldsTested: QUESTION_FIELDS,
-        candidateValues: buildTopicCandidates(resolved),
-        queryAttempts: questionResult.attempts,
-        queryLimit: questionResult.queryLimit,
-        appliedFilter: questionResult.appliedFilter,
-      }
-    );
-  }
-
-  const questionIds = questionResult.docs.map((doc) => doc.id);
-  const poolSize = questionIds.length;
-
-  if (poolSize < quizSize) {
-    throw new HttpsError(
-      "failed-precondition",
-      "Not enough questions to create quiz"
-    );
-  }
-
-  const progressData = progressSnap.data() as Partial<CategoryProgress> | undefined;
-  const isSameWeek = progressData?.weekKey === weekKey;
-  const seed =
-    isSameWeek && typeof progressData?.seed === "string"
-      ? progressData.seed
-      : `${uid}-${canonicalTopicId}-${weekKey}`;
-  const cursorStart = isSameWeek && Number.isInteger(progressData?.cursor)
-    ? (progressData!.cursor as number)
-    : 0;
-  const exhaustedBase =
-    isSameWeek && Number.isInteger(progressData?.exhaustedCount)
-      ? (progressData!.exhaustedCount as number)
-      : 0;
-
-  const shuffledIds = seededShuffle(questionIds, seed);
-  const cursorBefore = ((cursorStart % poolSize) + poolSize) % poolSize;
-  const end = cursorBefore + quizSize;
-  let selectedIds: string[] = [];
-  let cursorAfter = 0;
-  let exhaustedThisPick = false;
-
-  if (end <= poolSize) {
-    selectedIds = shuffledIds.slice(cursorBefore, end);
-    cursorAfter = end === poolSize ? 0 : end;
-    exhaustedThisPick = end === poolSize;
-  } else {
-    selectedIds = [
-      ...shuffledIds.slice(cursorBefore),
-      ...shuffledIds.slice(0, end - poolSize),
-    ];
-    cursorAfter = end - poolSize;
-    exhaustedThisPick = true;
-  }
-
-  const exhaustedCount =
-    exhaustedBase + (exhaustedThisPick ? 1 : 0);
-
-  await progressRef.set(
-    {
-      seed,
-      cursor: cursorAfter,
-      exhaustedCount,
-      weekKey,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    },
-    { merge: true }
-  );
-
-  emitQuizAnalyticsEvent("quiz_started", {
-    categoryId: canonicalTopicId,
-    quizSize,
-    poolSize,
-    exhaustedCount,
-    weekKey,
-    mode: "solo",
+  const packResult = await generateTriviaPack(db, {
+    topicId: canonicalTopicId,
+    questionCount: quizSize,
+    createdBy: uid,
   });
-
-  if (exhaustedThisPick) {
-    emitQuizAnalyticsEvent("category_exhausted", {
-      categoryId: canonicalTopicId,
-      quizSize,
-      poolSize,
-      exhaustedCount,
-      weekKey,
-      mode: "solo",
-    });
-  }
+  const questionIds = packResult.questionIds;
+  const poolSize = packResult.totalQuestions;
 
   const response: QuizSelectionResponse = {
-    questionIds: selectedIds,
+    questionIds,
     selectionMeta: {
-      exhaustedThisPick,
-      weekKey,
-      cursorBefore,
-      cursorAfter,
+      exhaustedThisPick: false,
+      weekKey: isoWeekKey(),
+      cursorBefore: 0,
+      cursorAfter: 0,
       poolSize,
     },
   };
