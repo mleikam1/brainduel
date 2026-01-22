@@ -1,6 +1,7 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions/logger";
 import * as admin from "firebase-admin";
+import type { FirebaseFirestore } from "firebase-admin";
 import { emitQuizAnalyticsEvent } from "./analytics";
 import {
   generateTriviaPack,
@@ -119,14 +120,38 @@ export const createGame = onCall(async (request) => {
     throw new HttpsError("invalid-argument", "topicId is required");
   }
 
-  const selectionSize = 10;
-  const packResult = await generateTriviaPack(db, {
-    topicId: trimmedTopicId,
-    questionCount: selectionSize,
-    createdBy: uid,
-  });
-  const questionDocs = packResult.questionDocs;
-  const triviaPackRefId = packResult.packId;
+  const requestedSize = 10;
+  let questionDocs: FirebaseFirestore.QueryDocumentSnapshot[] = [];
+  let triviaPackRefId: string | null = null;
+
+  try {
+    const packResult = await generateTriviaPack(db, {
+      topicId: trimmedTopicId,
+      questionCount: requestedSize,
+      createdBy: uid,
+    });
+    questionDocs = packResult.questionDocs;
+    triviaPackRefId = packResult.packId;
+  } catch (error) {
+    if (error instanceof HttpsError && error.code === "failed-precondition") {
+      // TEMPORARY: Force-play bypass for testing when topic has no questions.
+      logger.warn("TEMPORARY createGame fallback: no topic questions found.", {
+        topicId: trimmedTopicId,
+      });
+      const fallbackSnap = await db
+        .collection("questions")
+        .orderBy(admin.firestore.FieldPath.documentId())
+        .limit(5)
+        .get();
+      questionDocs = fallbackSnap.docs;
+    } else {
+      throw error;
+    }
+  }
+
+  if (questionDocs.length === 0) {
+    throw new HttpsError("failed-precondition", "No questions available");
+  }
 
   const allQuestions: QuestionDoc[] = questionDocs.map((d) => {
     const data = d.data() as Omit<QuestionDoc, "id">;
