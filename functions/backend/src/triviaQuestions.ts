@@ -247,13 +247,15 @@ export async function generateTriviaPack(
   const selectedDocs = questionDocs;
   const questionIds = selectedDocs.map((doc) => doc.id);
 
-  const packRef = db.collection("trivia_packs").doc();
+  const packRef = db.collection("triviaPacks").doc();
   await packRef.set({
     id: packRef.id,
     topicId: trimmedTopicId,
     questionIds,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     createdBy: options.createdBy,
+    status: "active",
+    version: 1,
   });
 
   return {
@@ -280,13 +282,15 @@ export async function createTriviaPackFromDocs(
     throw new HttpsError("invalid-argument", "Missing topicId");
   }
   const questionIds = options.questionDocs.map((doc) => doc.id);
-  const packRef = db.collection("trivia_packs").doc();
+  const packRef = db.collection("triviaPacks").doc();
   await packRef.set({
     id: packRef.id,
     topicId: trimmedTopicId,
     questionIds,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     createdBy: options.createdBy,
+    status: "active",
+    version: 1,
   });
 
   return {

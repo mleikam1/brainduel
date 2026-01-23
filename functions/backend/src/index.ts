@@ -4,7 +4,9 @@ import * as admin from "firebase-admin";
 import type { FirebaseFirestore } from "firebase-admin";
 import { emitQuizAnalyticsEvent } from "./analytics";
 import {
+  buildTopicCandidates,
   createTriviaPackFromDocs,
+  getRandomQuestionsForTopic,
   resolveTopicId,
   selectRandomDocs,
 } from "./triviaQuestions";
@@ -41,15 +43,37 @@ interface TriviaPackRecord {
   questionIds: string[];
   createdAt: admin.firestore.Timestamp;
   createdBy?: string;
+  status?: string;
+  version?: number;
 }
 
 interface TriviaPackResponse {
   triviaPackId: string;
+  gameId?: string;
   topicId: string;
   questionIds: string[];
   createdAt: admin.firestore.Timestamp;
   createdBy?: string;
   questionsSnapshot: SharedQuizSnapshotQuestion[];
+}
+
+interface TriviaPackScoreEntry {
+  uid: string;
+  score: number;
+  maxScore: number;
+  correct?: number;
+  durationSeconds?: number;
+  completedAt: admin.firestore.Timestamp;
+}
+
+interface TriviaPackLeaderboardEntry {
+  uid: string;
+  score: number;
+  maxScore: number;
+  correct?: number;
+  durationSeconds?: number;
+  rank: number;
+  completedAt: admin.firestore.Timestamp;
 }
 
 interface SharedQuizResponse {
@@ -124,6 +148,14 @@ function normalizeQuestionSnapshot(
   };
 }
 
+function dedupeDocs(
+  docs: FirebaseFirestore.QueryDocumentSnapshot[]
+): FirebaseFirestore.QueryDocumentSnapshot[] {
+  const unique = new Map<string, FirebaseFirestore.QueryDocumentSnapshot>();
+  docs.forEach((doc) => unique.set(doc.id, doc));
+  return Array.from(unique.values());
+}
+
 async function resolveQuestionsSnapshot(
   questionIds: string[],
   db: FirebaseFirestore.Firestore
@@ -148,104 +180,207 @@ async function resolveQuestionsSnapshot(
   });
 }
 
+function buildTriviaPackLeaderboard(
+  entries: TriviaPackScoreEntry[],
+  currentUid: string,
+  limit = 10
+): { entries: TriviaPackLeaderboardEntry[]; userRank: number } {
+  const sorted = [...entries].sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    return a.completedAt.toMillis() - b.completedAt.toMillis();
+  });
+  let userRank = -1;
+  const ranked = sorted.map((entry, index) => {
+    const rank = index + 1;
+    if (entry.uid === currentUid) {
+      userRank = rank;
+    }
+    return {
+      uid: entry.uid,
+      score: entry.score,
+      maxScore: entry.maxScore,
+      correct: entry.correct,
+      durationSeconds: entry.durationSeconds,
+      rank,
+      completedAt: entry.completedAt,
+    };
+  });
+  return {
+    entries: ranked.slice(0, limit),
+    userRank,
+  };
+}
+
 /**
  * Callable: createGame
  */
 export const createGame = onCall(async (request) => {
   const uid = request.auth?.uid;
   const topicId = request.data?.topicId as string | undefined;
+  const triviaPackId = request.data?.triviaPackId as string | undefined;
 
   if (!uid) {
     throw new HttpsError("unauthenticated", "User must be authenticated");
   }
   const rawTopicId = typeof topicId === "string" ? topicId.trim() : "";
-  if (!rawTopicId) {
-    throw new HttpsError("invalid-argument", "topicId is required");
+  const rawPackId = typeof triviaPackId === "string" ? triviaPackId.trim() : "";
+  if (!rawTopicId && !rawPackId) {
+    throw new HttpsError("invalid-argument", "topicId or triviaPackId is required");
   }
-  const resolved = await resolveTopicId(db, rawTopicId);
-  const canonicalTopicId = resolved.canonicalTopicId;
 
   const requestedSize = 10;
-  let questionDocs: FirebaseFirestore.QueryDocumentSnapshot[] = [];
   let triviaPackRefId: string | null = null;
-  let usedFallback = false;
+  let questionsSnapshot: SharedQuizSnapshotQuestion[] = [];
+  let questionIds: string[] = [];
+  let canonicalTopicId = rawTopicId;
+  let poolSize = 0;
+  let selectionSize = 0;
+  let usedExistingPack = false;
+  let appliedCandidates: string[] = [];
+  let appliedFilters: Record<string, string[] | string> = {};
+  let resolvedFrom = "unknown";
+  let mappingIssues: string[] = [];
 
-  const topicQuerySnap = await db
-    .collection("questions")
-    .where("topicId", "==", canonicalTopicId)
-    .get();
-  logger.info("createGame topic query", {
-    topicId: canonicalTopicId,
-    inputTopicId: rawTopicId,
-    resolvedFrom: resolved.resolvedFrom,
-    mappingIssues: resolved.mappingIssues,
-    topicQueryCount: topicQuerySnap.size,
-  });
+  if (rawPackId) {
+    const packSnap = await db.doc(`triviaPacks/${rawPackId}`).get();
+    if (!packSnap.exists) {
+      throw new HttpsError("not-found", "Trivia pack not found");
+    }
+    const packData = packSnap.data() as TriviaPackRecord;
+    const packQuestionIds = Array.isArray(packData.questionIds)
+      ? packData.questionIds
+      : [];
+    if (packQuestionIds.length === 0) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Trivia pack is missing questions"
+      );
+    }
+    usedExistingPack = true;
+    triviaPackRefId = packSnap.id;
+    canonicalTopicId = packData.topicId ?? rawTopicId;
+    questionIds = packQuestionIds;
+    questionsSnapshot = await resolveQuestionsSnapshot(packQuestionIds, db);
+    poolSize = packQuestionIds.length;
+    selectionSize = packQuestionIds.length;
 
-  if (topicQuerySnap.empty) {
-    usedFallback = true;
-    logger.warn("createGame topic query empty; falling back to all questions", {
+    logger.info("createGame using existing trivia pack", {
+      triviaPackId: packSnap.id,
       topicId: canonicalTopicId,
-      inputTopicId: rawTopicId,
-      query: { topicId: canonicalTopicId },
+      questionCount: packQuestionIds.length,
     });
-    const fallbackSnap = await db.collection("questions").get();
-    questionDocs = fallbackSnap.docs;
   } else {
-    questionDocs = topicQuerySnap.docs;
-  }
+    const resolved = await resolveTopicId(db, rawTopicId);
+    canonicalTopicId = resolved.canonicalTopicId;
+    resolvedFrom = resolved.resolvedFrom;
+    mappingIssues = resolved.mappingIssues;
 
-  if (questionDocs.length === 0) {
-    logger.warn("createGame no questions available after fallback", {
+    appliedCandidates = buildTopicCandidates(resolved);
+    const candidates = appliedCandidates.length > 0 ? appliedCandidates : [canonicalTopicId];
+    const limitedCandidates = candidates.slice(0, 10);
+    const topicExists = (await db.doc(`topics/${canonicalTopicId}`).get()).exists;
+    const categoryExists = (await db.doc(`categories/${canonicalTopicId}`).get()).exists;
+
+    const topicQuery =
+      limitedCandidates.length > 1
+        ? db.collection("questions").where("topicId", "in", limitedCandidates)
+        : db.collection("questions").where("topicId", "==", limitedCandidates[0]);
+    const categoryQuery =
+      limitedCandidates.length > 1
+        ? db.collection("questions").where("categoryId", "in", limitedCandidates)
+        : db.collection("questions").where("categoryId", "==", limitedCandidates[0]);
+
+    const [topicQuerySnap, categoryQuerySnap] = await Promise.all([
+      topicQuery.get(),
+      categoryQuery.get(),
+    ]);
+
+    appliedFilters = {
+      topicId: limitedCandidates,
+      categoryId: limitedCandidates,
+    };
+
+    const questionDocs = dedupeDocs([
+      ...topicQuerySnap.docs,
+      ...categoryQuerySnap.docs,
+    ]);
+    poolSize = questionDocs.length;
+
+    logger.info("createGame question pool", {
       topicId: canonicalTopicId,
       inputTopicId: rawTopicId,
-      usedFallback,
+      resolvedFrom,
+      mappingIssues,
+      topicExists,
+      categoryExists,
+      appliedCandidates: limitedCandidates,
+      topicQueryCount: topicQuerySnap.size,
+      categoryQueryCount: categoryQuerySnap.size,
+      poolSize,
     });
-    throw new HttpsError("failed-precondition", "No questions available");
+
+    if (poolSize < requestedSize) {
+      logger.warn("createGame insufficient questions for topic", {
+        topicId: canonicalTopicId,
+        inputTopicId: rawTopicId,
+        poolSize,
+        requestedSize,
+        appliedFilters,
+      });
+      throw new HttpsError(
+        "failed-precondition",
+        `Not enough questions for topic ${canonicalTopicId}. Found ${poolSize}, need ${requestedSize}.`,
+        {
+          code: "INSUFFICIENT_QUESTIONS",
+          topicId: canonicalTopicId,
+          inputTopicId: rawTopicId,
+          poolSize,
+          requestedSize,
+          appliedFilters,
+        }
+      );
+    }
+
+    const selectedDocs = selectRandomDocs(questionDocs, requestedSize);
+    questionIds = selectedDocs.map((doc) => doc.id);
+    selectionSize = selectedDocs.length;
+
+    const packResult = await createTriviaPackFromDocs(db, {
+      topicId: canonicalTopicId,
+      questionDocs: selectedDocs,
+      createdBy: uid,
+    });
+    triviaPackRefId = packResult.packId;
+
+    logger.info("createGame question selection", {
+      topicId: canonicalTopicId,
+      poolSize,
+      selectedCount: selectionSize,
+      selectionIds: questionIds.slice(0, 5),
+    });
+
+    logger.info("createGame pack summary", {
+      topicId: canonicalTopicId,
+      finalPackCount: selectionSize,
+      triviaPackId: triviaPackRefId,
+    });
+
+    const allQuestions: QuestionDoc[] = selectedDocs.map((d) => {
+      const data = d.data() as Omit<QuestionDoc, "id">;
+      return {
+        id: d.id,
+        ...data,
+      };
+    });
+    questionsSnapshot = allQuestions.map((q) => ({
+      questionId: q.id,
+      prompt: q.prompt,
+      choices: q.choices,
+      difficulty: q.difficulty ?? "medium",
+    }));
   }
-
-  const selectedDocs = selectRandomDocs(questionDocs, requestedSize);
-  const allQuestions: QuestionDoc[] = selectedDocs.map((d) => {
-    const data = d.data() as Omit<QuestionDoc, "id">;
-    return {
-      id: d.id,
-      ...data,
-    };
-  });
-
-  const packResult = await createTriviaPackFromDocs(db, {
-    topicId: canonicalTopicId,
-    questionDocs: selectedDocs,
-    createdBy: uid,
-  });
-  triviaPackRefId = packResult.packId;
 
   const gameId = db.collection("games").doc().id;
-  const poolSize = allQuestions.length;
-  const selected: QuestionDoc[] = allQuestions;
-  const selectionSize = selected.length;
-
-  logger.info("createGame question selection", {
-    topicId: canonicalTopicId,
-    poolSize,
-    selectedCount: selected.length,
-    usedFallback,
-    selectionIds: selected.slice(0, 5).map((q) => q.id),
-  });
-
-  logger.info("createGame pack summary", {
-    topicId: canonicalTopicId,
-    usedFallback,
-    finalPackCount: selectionSize,
-  });
-
-  const questionsSnapshot = selected.map((q) => ({
-    questionId: q.id,
-    prompt: q.prompt,
-    choices: q.choices,
-    difficulty: q.difficulty ?? "medium",
-  }));
-
   const gameRef = db.doc(`games/${gameId}`);
   const playerRef = db.doc(`games/${gameId}/players/${uid}`);
 
@@ -258,9 +393,10 @@ export const createGame = onCall(async (request) => {
     createdByUid: uid,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     status: "open",
-    questionIds: selected.map((q) => q.id),
+    questionIds,
     questionsSnapshot,
     triviaPackId: triviaPackRefId ?? null,
+    packSource: usedExistingPack ? "existing" : "generated",
   });
 
   batch.set(playerRef, {
@@ -273,7 +409,7 @@ export const createGame = onCall(async (request) => {
 
   emitQuizAnalyticsEvent("quiz_started", {
     categoryId: canonicalTopicId,
-    quizSize: selectionSize,
+    quizSize: selectionSize || questionsSnapshot.length,
     poolSize,
     exhaustedCount: 0,
     weekKey: isoWeekKey(),
@@ -287,6 +423,12 @@ export const createGame = onCall(async (request) => {
     categoryId: canonicalTopicId,
     questionsSnapshot,
     triviaPackId: triviaPackRefId ?? null,
+    questionIds,
+    selectionMeta: {
+      exhaustedThisPick: false,
+      poolSize,
+      weekKey: isoWeekKey(),
+    },
   };
 });
 
@@ -585,7 +727,7 @@ export const getTriviaPack = onCall(async (request) => {
     throw new HttpsError("invalid-argument", "triviaPackId is required");
   }
 
-  const packSnap = await db.doc(`trivia_packs/${triviaPackId}`).get();
+  const packSnap = await db.doc(`triviaPacks/${triviaPackId}`).get();
   if (!packSnap.exists) {
     throw new HttpsError("not-found", "Trivia pack not found");
   }
@@ -613,7 +755,127 @@ export const getTriviaPack = onCall(async (request) => {
     questionsSnapshot,
   };
 
-  return response;
+  return {
+    ...response,
+    gameId: packSnap.id,
+  };
+});
+
+/**
+ * Callable: submitSoloScore
+ */
+export const submitSoloScore = onCall(async (request) => {
+  const uid = request.auth?.uid;
+  const triviaPackId = request.data?.triviaPackId as string | undefined;
+  const scoreInput = request.data?.score as number | undefined;
+  const metadata = request.data?.metadata as
+    | { durationSeconds?: number; correct?: number; total?: number }
+    | undefined;
+  const answers = request.data?.answers as
+    | { questionId: string; selectedIndex: number }[]
+    | undefined;
+
+  if (!uid) {
+    throw new HttpsError("unauthenticated", "User must be authenticated");
+  }
+  if (!triviaPackId) {
+    throw new HttpsError("invalid-argument", "triviaPackId is required");
+  }
+
+  const packSnap = await db.doc(`triviaPacks/${triviaPackId}`).get();
+  if (!packSnap.exists) {
+    throw new HttpsError("not-found", "Trivia pack not found");
+  }
+
+  const packData = packSnap.data() as TriviaPackRecord;
+  const questionIds = Array.isArray(packData.questionIds)
+    ? packData.questionIds
+    : [];
+  if (questionIds.length === 0) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Trivia pack is missing questions"
+    );
+  }
+
+  let computedScore = typeof scoreInput === "number" ? scoreInput : null;
+  let correctCount: number | undefined;
+  const maxScore = questionIds.length;
+
+  if (Array.isArray(answers) && answers.length > 0) {
+    const answerMap = new Map(
+      answers.map((answer) => [answer.questionId, answer.selectedIndex])
+    );
+    const questionRefs = questionIds.map((id) => db.doc(`questions/${id}`));
+    const questionDocs = await db.getAll(...questionRefs);
+    let score = 0;
+    let correct = 0;
+    questionDocs.forEach((doc) => {
+      if (!doc.exists) {
+        return;
+      }
+      const data = doc.data() as QuestionDoc;
+      const selectedIndex = answerMap.get(doc.id);
+      if (selectedIndex === data.correctIndex) {
+        score += 1;
+        correct += 1;
+      }
+    });
+    computedScore = score;
+    correctCount = correct;
+  }
+
+  if (computedScore == null || Number.isNaN(computedScore)) {
+    throw new HttpsError("invalid-argument", "score or answers are required");
+  }
+
+  const completedAt = nowTimestamp();
+  const durationSeconds =
+    typeof metadata?.durationSeconds === "number"
+      ? Math.max(0, Math.floor(metadata.durationSeconds))
+      : undefined;
+
+  const scoreEntry: TriviaPackScoreEntry = {
+    uid,
+    score: Math.max(0, Math.floor(computedScore)),
+    maxScore,
+    correct: correctCount ?? metadata?.correct,
+    durationSeconds,
+    completedAt,
+  };
+
+  await db
+    .doc(`triviaPacks/${triviaPackId}/scores/${uid}`)
+    .set(scoreEntry, { merge: true });
+
+  const scoresSnap = await db
+    .collection(`triviaPacks/${triviaPackId}/scores`)
+    .orderBy("score", "desc")
+    .orderBy("completedAt", "asc")
+    .get();
+
+  const entries = scoresSnap.docs.map((doc) => {
+    const data = doc.data() as TriviaPackScoreEntry;
+    return {
+      uid: doc.id,
+      score: data.score,
+      maxScore: data.maxScore,
+      correct: data.correct,
+      durationSeconds: data.durationSeconds,
+      completedAt: data.completedAt,
+    };
+  });
+
+  const leaderboard = buildTriviaPackLeaderboard(entries, uid, 10);
+
+  return {
+    triviaPackId,
+    score: scoreEntry.score,
+    maxScore,
+    correct: scoreEntry.correct,
+    total: maxScore,
+    leaderboard,
+  };
 });
 
 /**

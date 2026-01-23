@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/game_answer.dart';
 import '../models/game_session.dart';
+import '../models/solo_pack_leaderboard.dart';
 import '../services/analytics_service.dart';
 import '../services/game_functions_service.dart';
 import '../services/quiz_analytics.dart';
@@ -32,6 +33,7 @@ class TriviaGameState {
   final DateTime? startedAt;
   final bool isLocked;
   final bool showAlreadyCompletedModal;
+  final SoloPackLeaderboard? packLeaderboard;
 
   const TriviaGameState({
     required this.loading,
@@ -50,6 +52,7 @@ class TriviaGameState {
     required this.startedAt,
     required this.isLocked,
     required this.showAlreadyCompletedModal,
+    required this.packLeaderboard,
   });
 
   factory TriviaGameState.initial() => const TriviaGameState(
@@ -69,6 +72,7 @@ class TriviaGameState {
     startedAt: null,
     isLocked: false,
     showAlreadyCompletedModal: false,
+    packLeaderboard: null,
   );
 
   TriviaGameState copyWith({
@@ -88,6 +92,7 @@ class TriviaGameState {
     DateTime? startedAt,
     bool? isLocked,
     bool? showAlreadyCompletedModal,
+    SoloPackLeaderboard? packLeaderboard,
   }) {
     return TriviaGameState(
       loading: loading ?? this.loading,
@@ -106,6 +111,7 @@ class TriviaGameState {
       startedAt: startedAt ?? this.startedAt,
       isLocked: isLocked ?? this.isLocked,
       showAlreadyCompletedModal: showAlreadyCompletedModal ?? this.showAlreadyCompletedModal,
+      packLeaderboard: packLeaderboard ?? this.packLeaderboard,
     );
   }
 }
@@ -393,30 +399,15 @@ class QuizController extends StateNotifier<TriviaGameState> {
           );
           return;
         }
-        try {
-          session = await ref
-              .read(quizRepositoryProvider)
-              .fetchSoloQuiz(categoryId: trimmedCategoryId);
-          _logBackendStartEvent(
-            event: 'backend_fallback_used',
-            topicId: trimmedCategoryId,
-            code: e.code,
-            message: e.message,
-            details: e.details,
-          );
-        } catch (fallbackError, fallbackSt) {
-          debugPrint('QuizController startGame fallback error: $fallbackError');
-          debugPrintStack(stackTrace: fallbackSt);
-          _logBackendStartEvent(
-            event: 'backend_unrecoverable_error',
-            topicId: trimmedCategoryId,
-            code: e.code,
-            message: e.message,
-            details: e.details,
-          );
-          state = _markGameStartFailure(_formatError(fallbackError));
-          return;
-        }
+        _logBackendStartEvent(
+          event: 'backend_unrecoverable_error',
+          topicId: trimmedCategoryId,
+          code: e.code,
+          message: e.message,
+          details: e.details,
+        );
+        state = _markGameStartFailure(_messageForGameError(e));
+        return;
       }
       // Fairness requires server-generated question snapshots so clients cannot reshuffle or peek at answers.
       if (_completedGameIds.contains(session.gameId)) {
@@ -585,6 +576,75 @@ class QuizController extends StateNotifier<TriviaGameState> {
     }
   }
 
+  Future<void> loadTriviaPack(String triviaPackId) async {
+    final trimmedPackId = triviaPackId.trim();
+    if (trimmedPackId.isEmpty) {
+      state = state.copyWith(error: 'This shared pack link is missing an ID.');
+      _logGameFailed('load_pack', code: 'missing-pack-id');
+      return;
+    }
+    final userId = ref.read(authUserIdProvider);
+    if (userId == null || userId.isEmpty) {
+      state = _markGameStartFailure('Please sign in to continue.');
+      _logGameFailed('load_pack', code: 'unauthenticated');
+      return;
+    }
+    final userReady = ref.read(userBootstrapReadyProvider);
+    if (!userReady) {
+      state = _markGameStartFailure(
+        'Your account is still getting set up. Please try again shortly.',
+      );
+      _logGameFailed('load_pack', code: 'user-not-ready');
+      return;
+    }
+    state = state.copyWith(loading: true, error: null);
+    try {
+      final gameFunctions = ref.read(gameFunctionsServiceProvider);
+      final analytics = ref.read(analyticsServiceProvider);
+      final session = await gameFunctions.getTriviaPack(trimmedPackId);
+      if (_completedGameIds.contains(session.gameId)) {
+        state = state.copyWith(
+          loading: false,
+          session: null,
+          error: 'That trivia pack has already been completed.',
+        );
+        return;
+      }
+      analytics.logEvent('trivia_game_started', parameters: {
+        'gameId': session.gameId,
+        'triviaPackId': trimmedPackId,
+        'source': 'shared_pack',
+      });
+
+      _activeMode = 'pack';
+      _logQuizStarted(session, mode: 'pack');
+
+      _selectedIndexByQuestionId.clear();
+      state = TriviaGameState.initial().copyWith(
+        session: session,
+        loading: false,
+        startedAt: DateTime.now(),
+      );
+    } catch (e, st) {
+      debugPrint('QuizController loadTriviaPack error: $e');
+      debugPrintStack(stackTrace: st);
+      if (e is GameFunctionsException) {
+        _logGameFailed('load_pack', code: e.code);
+        if (_isAlreadyCompletedError(e)) {
+          state = _markAlreadyCompleted(
+            state.copyWith(loading: false),
+            message: _messageForGameError(e),
+          );
+        } else {
+          state = _markGameStartFailure(_messageForGameError(e));
+        }
+      } else {
+        _logGameFailed('load_pack');
+        state = _markGameStartFailure(_formatError(e));
+      }
+    }
+  }
+
   Future<String?> createSharedQuiz() async {
     final session = state.session;
     if (session == null || state.isSubmitting) return null;
@@ -687,7 +747,7 @@ class QuizController extends StateNotifier<TriviaGameState> {
     );
   }
 
-  Future<({int score, int maxScore, int? correct, int? total})?>
+  Future<({int score, int maxScore, int? correct, int? total, SoloPackLeaderboard? leaderboard})?>
       completeGame() async {
     final session = state.session;
     if (session == null) return null;
@@ -703,18 +763,36 @@ class QuizController extends StateNotifier<TriviaGameState> {
         return GameAnswer(
           questionId: question.id,
           choice: question.choices[boundedIndex],
+          selectedIndex: boundedIndex,
         );
       }).toList();
       final result = await ref.read(gameFunctionsServiceProvider).completeGame(
             session.gameId,
             answers,
           );
+      SoloPackLeaderboard? leaderboard;
+      final triviaPackId = session.triviaPackId;
+      if (triviaPackId != null && triviaPackId.isNotEmpty) {
+        final durationSeconds = state.startedAt == null
+            ? null
+            : DateTime.now().difference(state.startedAt!).inSeconds;
+        final leaderboardResult =
+            await ref.read(gameFunctionsServiceProvider).submitSoloScore(
+                  triviaPackId: triviaPackId,
+                  score: result.score,
+                  correct: result.correct,
+                  total: result.total,
+                  durationSeconds: durationSeconds,
+                );
+        leaderboard = leaderboardResult.leaderboard;
+      }
       _completedGameIds.add(session.gameId);
       state = state.copyWith(
         points: result.score,
         correctAnswers: result.correct ?? state.correctAnswers,
         isSubmitting: false,
         isLocked: true,
+        packLeaderboard: leaderboard,
       );
       _logQuizCompleted(
         session: session,
@@ -731,7 +809,13 @@ class QuizController extends StateNotifier<TriviaGameState> {
           'total': result.total ?? session.questionsSnapshot.length,
         },
       );
-      return result;
+      return (
+        score: result.score,
+        maxScore: result.maxScore,
+        correct: result.correct,
+        total: result.total,
+        leaderboard: leaderboard,
+      );
     } catch (e, st) {
       debugPrint('QuizController completeGame error: $e');
       debugPrintStack(stackTrace: st);
@@ -750,6 +834,74 @@ class QuizController extends StateNotifier<TriviaGameState> {
         }
       } else {
         _logGameFailed('complete');
+        state = state.copyWith(isSubmitting: false, error: _formatError(e));
+      }
+      return null;
+    }
+  }
+
+  Future<({int score, int maxScore, int? correct, int? total, SoloPackLeaderboard leaderboard})?>
+      completeTriviaPack() async {
+    final session = state.session;
+    if (session == null) return null;
+    final triviaPackId = session.triviaPackId;
+    if (triviaPackId == null || triviaPackId.isEmpty) {
+      state = state.copyWith(error: 'Unable to submit pack score.');
+      return null;
+    }
+    try {
+      state = state.copyWith(isSubmitting: true, error: null);
+      final answers = session.questionsSnapshot.map((question) {
+        final index = _selectedIndexByQuestionId[question.id] ?? 0;
+        final boundedIndex = index.clamp(0, question.choices.length - 1);
+        return GameAnswer(
+          questionId: question.id,
+          choice: question.choices[boundedIndex],
+          selectedIndex: boundedIndex,
+        );
+      }).toList();
+      final durationSeconds = state.startedAt == null
+          ? null
+          : DateTime.now().difference(state.startedAt!).inSeconds;
+      final result = await ref.read(gameFunctionsServiceProvider).submitSoloScore(
+            triviaPackId: triviaPackId,
+            score: 0,
+            correct: state.correctAnswers,
+            total: session.questionsSnapshot.length,
+            durationSeconds: durationSeconds,
+            answers: answers,
+          );
+      state = state.copyWith(
+        points: result.score,
+        correctAnswers: result.correct ?? state.correctAnswers,
+        isSubmitting: false,
+        isLocked: true,
+        packLeaderboard: result.leaderboard,
+      );
+      _logQuizCompleted(
+        session: session,
+        score: result.score,
+        correctCount: result.correct ?? state.correctAnswers,
+        mode: _activeMode ?? 'pack',
+      );
+      return (
+        score: result.score,
+        maxScore: result.maxScore,
+        correct: result.correct,
+        total: result.total,
+        leaderboard: result.leaderboard,
+      );
+    } catch (e, st) {
+      debugPrint('QuizController completeTriviaPack error: $e');
+      debugPrintStack(stackTrace: st);
+      if (e is GameFunctionsException) {
+        _logGameFailed('complete_pack', code: e.code);
+        state = state.copyWith(
+          isSubmitting: false,
+          error: _messageForGameError(e),
+        );
+      } else {
+        _logGameFailed('complete_pack');
         state = state.copyWith(isSubmitting: false, error: _formatError(e));
       }
       return null;

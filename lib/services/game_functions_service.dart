@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/game_answer.dart';
 import '../models/game_session.dart';
+import '../models/solo_pack_leaderboard.dart';
 
 final gameFunctionsServiceProvider = Provider<GameFunctionsService>((ref) {
   return GameFunctionsService(FirebaseFunctions.instance);
@@ -61,6 +62,18 @@ class GameFunctionsService {
     }
   }
 
+  Future<GameSession> getTriviaPack(String triviaPackId) async {
+    try {
+      final callable = _functions.httpsCallable('getTriviaPack');
+      final result = await callable.call({'triviaPackId': triviaPackId});
+      final data = _requireMap(result.data, 'getTriviaPack');
+      return GameSession.fromJson(data);
+    } on FirebaseFunctionsException catch (error) {
+      _logCallableError('getTriviaPack', error);
+      throw GameFunctionsException.fromFirebase(error);
+    }
+  }
+
   Future<({String quizId, String categoryId})> createSharedQuiz({
     required String categoryId,
     required List<String> questionIds,
@@ -103,6 +116,53 @@ class GameFunctionsService {
       );
     } on FirebaseFunctionsException catch (error) {
       _logCallableError('completeGame', error);
+      throw GameFunctionsException.fromFirebase(error);
+    }
+  }
+
+  Future<({
+    int score,
+    int maxScore,
+    int? correct,
+    int? total,
+    SoloPackLeaderboard leaderboard,
+  })> submitSoloScore({
+    required String triviaPackId,
+    required int score,
+    int? correct,
+    int? total,
+    int? durationSeconds,
+    List<GameAnswer>? answers,
+  }) async {
+    try {
+      final callable = _functions.httpsCallable('submitSoloScore');
+      final result = await callable.call({
+        'triviaPackId': triviaPackId,
+        'score': score,
+        'metadata': {
+          if (durationSeconds != null) 'durationSeconds': durationSeconds,
+          if (correct != null) 'correct': correct,
+          if (total != null) 'total': total,
+        },
+        if (answers != null)
+          'answers': answers
+              .map((answer) => {
+                    'questionId': answer.questionId,
+                    'selectedIndex': answer.selectedIndex,
+                  })
+              .toList(),
+      });
+      final data = _requireMap(result.data, 'submitSoloScore');
+      final leaderboardJson = _requireMap(data['leaderboard'], 'submitSoloScore.leaderboard');
+      return (
+        score: (data['score'] as num).toInt(),
+        maxScore: (data['maxScore'] as num).toInt(),
+        correct: (data['correct'] as num?)?.toInt(),
+        total: (data['total'] as num?)?.toInt(),
+        leaderboard: SoloPackLeaderboard.fromJson(leaderboardJson),
+      );
+    } on FirebaseFunctionsException catch (error) {
+      _logCallableError('submitSoloScore', error);
       throw GameFunctionsException.fromFirebase(error);
     }
   }

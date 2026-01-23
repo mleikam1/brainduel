@@ -1,37 +1,31 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
 import '../app.dart';
 import '../state/auth_provider.dart';
-import '../state/categories_provider.dart';
 import '../state/quiz_controller.dart';
-import '../state/user_stats_provider.dart';
 import '../state/subscription_provider.dart';
+import '../state/user_stats_provider.dart';
 import '../theme/brain_duel_theme.dart';
 import '../widgets/app_scaffold.dart';
 import '../widgets/bd_progress_bar.dart';
 import '../widgets/bd_stat_pill.dart';
 import '../widgets/trivia_question_view.dart';
 
-class TriviaGameScreen extends ConsumerStatefulWidget {
-  const TriviaGameScreen({super.key});
+class SharedTriviaPackScreen extends ConsumerStatefulWidget {
+  const SharedTriviaPackScreen({super.key, required this.triviaPackId});
+
+  final String triviaPackId;
 
   @override
-  ConsumerState<TriviaGameScreen> createState() => _TriviaGameScreenState();
+  ConsumerState<SharedTriviaPackScreen> createState() => _SharedTriviaPackScreenState();
 }
 
-class TriviaGameLaunchArgs {
-  const TriviaGameLaunchArgs({this.categoryId, this.gameId});
-
-  final String? categoryId;
-  final String? gameId;
-
-  bool get isShared => gameId != null && gameId!.isNotEmpty;
-}
-
-class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> with TickerProviderStateMixin {
-  TriviaGameLaunchArgs? _launchArgs;
+class _SharedTriviaPackScreenState extends ConsumerState<SharedTriviaPackScreen>
+    with TickerProviderStateMixin {
   Timer? _readTimer;
   Timer? _answerTimer;
   Timer? _advanceTimer;
@@ -40,12 +34,6 @@ class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> with Ticker
   late final AnimationController _answerTimerController;
   bool _started = false;
   late final ProviderSubscription _sessionSubscription;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _resolveLaunchArgs();
-  }
 
   @override
   void initState() {
@@ -64,21 +52,6 @@ class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> with Ticker
         _scheduleAdvance();
       }
     });
-  }
-
-  void _resolveLaunchArgs() {
-    if (_launchArgs != null) return;
-    final args = ModalRoute.of(context)?.settings.arguments;
-    if (args is TriviaGameLaunchArgs) {
-      _launchArgs = args;
-    } else if (args is Map) {
-      _launchArgs = TriviaGameLaunchArgs(
-        categoryId: args['categoryId'] as String?,
-        gameId: args['gameId'] as String?,
-      );
-    } else if (args is String) {
-      _launchArgs = TriviaGameLaunchArgs(categoryId: args);
-    }
   }
 
   @override
@@ -139,7 +112,7 @@ class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> with Ticker
   void _finishGameAndGoToResults() {
     final notifier = ref.read(quizControllerProvider.notifier);
     _cancelTimers();
-    notifier.completeGame().then((result) {
+    notifier.completeTriviaPack().then((result) {
       if (!mounted || result == null) return;
       final state = ref.read(quizControllerProvider);
       final session = state.session!;
@@ -163,59 +136,21 @@ class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> with Ticker
           'startedAt': state.startedAt?.toIso8601String(),
           'isPaidUser': ref.read(isPaidUserProvider),
           'triviaPackId': session.triviaPackId,
-          if (result.leaderboard != null) 'leaderboard': result.leaderboard!.toJson(),
+          'leaderboard': result.leaderboard.toJson(),
         },
       );
     });
   }
 
-  Future<void> _showAlreadyCompletedDialog() async {
-    if (!mounted) return;
-    await showDialog<void>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Quiz already completed'),
-        content: const Text(
-          'This quiz has already been completed. Each quiz can only be played once.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    ref.listen(quizControllerProvider, (previous, next) {
-      final wasShowing = previous?.showAlreadyCompletedModal ?? false;
-      if (next.showAlreadyCompletedModal && !wasShowing) {
-        _showAlreadyCompletedDialog();
-        ref.read(quizControllerProvider.notifier).dismissAlreadyCompletedModal();
-      }
-    });
-    _resolveLaunchArgs();
-    final launchArgs = _launchArgs;
     final userReady = ref.watch(userBootstrapReadyProvider);
-    final categoriesReady =
-        ref.watch(categoriesProvider).maybeWhen(data: (_) => true, orElse: () => false);
-    if (!_started && launchArgs != null && userReady) {
-      final shouldStart = launchArgs.isShared || categoriesReady;
-      if (shouldStart) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted || _started) return;
-          final notifier = ref.read(quizControllerProvider.notifier);
-          if (launchArgs.isShared) {
-            notifier.loadGame(launchArgs.gameId!);
-          } else if (launchArgs.categoryId != null) {
-            notifier.startGame(launchArgs.categoryId!);
-          }
-          _started = true;
-        });
-      }
+    if (!_started && userReady) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _started) return;
+        ref.read(quizControllerProvider.notifier).loadTriviaPack(widget.triviaPackId);
+        _started = true;
+      });
     }
     final state = ref.watch(quizControllerProvider);
     final points = state.points;
@@ -224,7 +159,7 @@ class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> with Ticker
     return WillPopScope(
       onWillPop: () async => !state.hasAnsweredAny && !state.isSubmitting && !state.isLocked,
       child: BDAppScaffold(
-        title: 'Solo Match',
+        title: 'Shared Pack',
         subtitle: state.session?.topicId.toUpperCase(),
         leading: state.hasAnsweredAny || state.isLocked ? const SizedBox.shrink() : null,
         child: state.loading
@@ -234,18 +169,11 @@ class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> with Ticker
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text('Failed to start game:\n${state.error}'),
+                        Text('Failed to start pack:\n${state.error}'),
                         const SizedBox(height: 12),
                         FilledButton(
                           onPressed: () {
-                            final launchArgs = _launchArgs;
-                            if (launchArgs == null) return;
-                            final notifier = ref.read(quizControllerProvider.notifier);
-                            if (launchArgs.isShared) {
-                              notifier.loadGame(launchArgs.gameId!);
-                            } else if (launchArgs.categoryId != null) {
-                              notifier.startGame(launchArgs.categoryId!);
-                            }
+                            ref.read(quizControllerProvider.notifier).loadTriviaPack(widget.triviaPackId);
                           },
                           child: const Text('Retry'),
                         )
@@ -282,17 +210,19 @@ class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> with Ticker
                                     alignment: WrapAlignment.spaceBetween,
                                     children: [
                                       BDStatPill(label: 'PTS', value: '$points', icon: Icons.bolt),
-                                      BDStatPill(label: 'Mode', value: 'Solo', icon: Icons.flash_on),
+                                      BDStatPill(label: 'Mode', value: 'Pack', icon: Icons.flash_on),
                                     ],
                                   ),
                                   const SizedBox(height: 16),
                                   Text(
-                                    'Question ${state.currentIndex + 1} of ${state.session!.questionsSnapshot.length}',
+                                    'Question ${state.currentIndex + 1} '
+                                    'of ${state.session!.questionsSnapshot.length}',
                                     style: Theme.of(context).textTheme.labelLarge,
                                   ),
                                   const SizedBox(height: 8),
                                   BDProgressBar(
-                                    value: (state.currentIndex + 1) / state.session!.questionsSnapshot.length,
+                                    value: (state.currentIndex + 1) /
+                                        state.session!.questionsSnapshot.length,
                                   ),
                                   if (isAnswerPhase) ...[
                                     const SizedBox(height: 12),
@@ -323,9 +253,15 @@ class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> with Ticker
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      Icon(Icons.lightbulb_outline, color: Theme.of(context).colorScheme.primary),
+                                      Icon(
+                                        Icons.lightbulb_outline,
+                                        color: Theme.of(context).colorScheme.primary,
+                                      ),
                                       const SizedBox(width: 6),
-                                      Text('Need hint? Coming soon.', style: Theme.of(context).textTheme.bodyMedium),
+                                      Text(
+                                        'Need hint? Coming soon.',
+                                        style: Theme.of(context).textTheme.bodyMedium,
+                                      ),
                                     ],
                                   ),
                                 ],

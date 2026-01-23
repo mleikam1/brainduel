@@ -19,6 +19,24 @@ class ShareService {
     await Share.share(shareText);
   }
 
+  Future<void> shareTriviaPack({
+    required BuildContext context,
+    required String triviaPackId,
+    required String topicId,
+    required int score,
+  }) async {
+    final shareText = _buildTriviaPackText(
+      triviaPackId: triviaPackId,
+      topicId: topicId,
+      score: score,
+    );
+    if (kIsWeb) {
+      await _shareWeb(context, shareText);
+      return;
+    }
+    await Share.share(shareText);
+  }
+
   String _buildShareText({
     required ChallengeResult result,
     required ChallengeMetadata metadata,
@@ -29,12 +47,30 @@ class ShareService {
         'Think you can beat me? $challengeUrl';
   }
 
+  String _buildTriviaPackText({
+    required String triviaPackId,
+    required String topicId,
+    required int score,
+  }) {
+    final packUrl = _triviaPackLink(triviaPackId);
+    return 'I scored $score pts in "$topicId" on Brain Duel. '
+        'Can you beat my score? $packUrl';
+  }
+
   Uri _challengeLink(String challengeId) {
     final base = Uri.base;
     if (base.hasScheme && (base.scheme == 'http' || base.scheme == 'https')) {
       return base.replace(path: '/c/$challengeId', query: '', fragment: '');
     }
     return Uri.parse('https://brainduel.app/c/$challengeId');
+  }
+
+  Uri _triviaPackLink(String triviaPackId) {
+    final base = Uri.base;
+    if (base.hasScheme && (base.scheme == 'http' || base.scheme == 'https')) {
+      return base.replace(path: '/p/$triviaPackId', query: '', fragment: '');
+    }
+    return Uri.parse('https://brainduel.app/p/$triviaPackId');
   }
 
   Future<void> _shareWeb(BuildContext context, String shareText) async {
