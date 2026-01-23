@@ -37,47 +37,48 @@ class TriviaResultScreen extends ConsumerWidget {
         ? null
         : SoloPackLeaderboard.fromJson(Map<String, dynamic>.from(leaderboardJson));
 
-    final participants = leaderboard == null
-        ? [
-            LeaderboardEntry(name: 'You', points: points, time: timeTaken, rank: 2),
-            const LeaderboardEntry(
-              name: 'Renata M.',
-              points: 1840,
-              time: Duration(minutes: 1, seconds: 12),
-              rank: 1,
-            ),
-            const LeaderboardEntry(
-              name: 'Mike S.',
-              points: 1650,
-              time: Duration(minutes: 1, seconds: 26),
-              rank: 3,
-            ),
-            const LeaderboardEntry(
-              name: 'John M.',
-              points: 1240,
-              time: Duration(minutes: 1, seconds: 45),
-              rank: 4,
-            ),
-            const LeaderboardEntry(
-              name: 'Dinny K.',
-              points: 1180,
-              time: Duration(minutes: 1, seconds: 54),
-              rank: 5,
-            ),
-          ]..sort((a, b) => a.rank.compareTo(b.rank))
-        : leaderboard.entries.map((entry) {
-            final isYou = entry.rank == leaderboard.userRank;
-            final duration = entry.durationSeconds == null
-                ? const Duration(seconds: 0)
-                : Duration(seconds: entry.durationSeconds!);
-            return LeaderboardEntry(
-              name: isYou ? 'You' : 'Player ${entry.rank}',
-              points: entry.score,
-              time: duration,
-              rank: entry.rank,
-            );
-          }).toList()
-          ..sort((a, b) => a.rank.compareTo(b.rank));
+    final List<LeaderboardEntry> participants;
+    if (leaderboard == null) {
+      participants = [
+        LeaderboardEntry(name: 'You', points: points, time: timeTaken, rank: 2),
+        const LeaderboardEntry(
+          name: 'Renata M.',
+          points: 1840,
+          time: Duration(minutes: 1, seconds: 12),
+          rank: 1,
+        ),
+        const LeaderboardEntry(
+          name: 'Mike S.',
+          points: 1650,
+          time: Duration(minutes: 1, seconds: 26),
+          rank: 3,
+        ),
+        const LeaderboardEntry(
+          name: 'John M.',
+          points: 1240,
+          time: Duration(minutes: 1, seconds: 45),
+          rank: 4,
+        ),
+        const LeaderboardEntry(
+          name: 'Dinny K.',
+          points: 1180,
+          time: Duration(minutes: 1, seconds: 54),
+          rank: 5,
+        ),
+      ];
+    } else {
+      participants = leaderboard.entries.map((entry) {
+        final isYou = entry.rank == leaderboard.userRank;
+        final duration = Duration(seconds: entry.durationSeconds ?? 0);
+        return LeaderboardEntry(
+          name: isYou ? 'You' : 'Player ${entry.rank}',
+          points: entry.score,
+          time: duration,
+          rank: entry.rank,
+        );
+      }).toList();
+    }
+    participants.sort((a, b) => a.rank.compareTo(b.rank));
 
     return BDAppScaffold(
       title: 'Scoreboard',
