@@ -35,6 +35,23 @@ interface SharedQuizSnapshotQuestion {
   difficulty: string;
 }
 
+interface TriviaPackRecord {
+  id: string;
+  topicId: string;
+  questionIds: string[];
+  createdAt: admin.firestore.Timestamp;
+  createdBy?: string;
+}
+
+interface TriviaPackResponse {
+  triviaPackId: string;
+  topicId: string;
+  questionIds: string[];
+  createdAt: admin.firestore.Timestamp;
+  createdBy?: string;
+  questionsSnapshot: SharedQuizSnapshotQuestion[];
+}
+
 interface SharedQuizResponse {
   quizId: string;
   categoryId: string;
@@ -105,6 +122,30 @@ function normalizeQuestionSnapshot(
     choices: data.choices,
     difficulty: data.difficulty ?? "medium",
   };
+}
+
+async function resolveQuestionsSnapshot(
+  questionIds: string[],
+  db: FirebaseFirestore.Firestore
+): Promise<SharedQuizSnapshotQuestion[]> {
+  if (questionIds.length === 0) {
+    return [];
+  }
+  const questionRefs = questionIds.map((id) => db.doc(`questions/${id}`));
+  const questionDocs = await db.getAll(...questionRefs);
+  const questionById = new Map(
+    questionDocs.filter((doc) => doc.exists).map((doc) => [doc.id, doc])
+  );
+  return questionIds.map((id) => {
+    const doc = questionById.get(id);
+    if (!doc) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Trivia pack questions are missing"
+      );
+    }
+    return normalizeQuestionSnapshot(doc);
+  });
 }
 
 /**
@@ -530,6 +571,47 @@ export const getSharedQuiz = onCall(async (request) => {
     expiresAtMs: expiresAt.toMillis(),
     payload: response,
   });
+
+  return response;
+});
+
+/**
+ * Callable: getTriviaPack
+ */
+export const getTriviaPack = onCall(async (request) => {
+  const triviaPackId = request.data?.triviaPackId as string | undefined;
+
+  if (!triviaPackId) {
+    throw new HttpsError("invalid-argument", "triviaPackId is required");
+  }
+
+  const packSnap = await db.doc(`trivia_packs/${triviaPackId}`).get();
+  if (!packSnap.exists) {
+    throw new HttpsError("not-found", "Trivia pack not found");
+  }
+
+  const data = packSnap.data() as TriviaPackRecord;
+  const questionIds = Array.isArray(data.questionIds) ? data.questionIds : [];
+  if (questionIds.length === 0) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Trivia pack is missing questions"
+    );
+  }
+
+  const questionsSnapshot = await resolveQuestionsSnapshot(
+    questionIds,
+    db
+  );
+
+  const response: TriviaPackResponse = {
+    triviaPackId: packSnap.id,
+    topicId: data.topicId,
+    questionIds,
+    createdAt: data.createdAt,
+    createdBy: data.createdBy,
+    questionsSnapshot,
+  };
 
   return response;
 });
