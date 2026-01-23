@@ -119,7 +119,7 @@ async function runDiagnostics(request: {
   let packInfo: Record<string, unknown> | null = null;
   if (typeof triviaPackId === "string" && triviaPackId.trim()) {
     const packSnap = await db
-      .doc(`trivia_packs/${triviaPackId}`)
+      .doc(`triviaPacks/${triviaPackId}`)
       .get();
     packInfo = packSnap.exists ? packSnap.data() ?? null : null;
   }

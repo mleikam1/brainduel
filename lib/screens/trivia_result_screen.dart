@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../app.dart';
 import '../models/challenge_result.dart';
 import '../models/leaderboard_entry.dart';
+import '../models/solo_pack_leaderboard.dart';
 import '../state/challenge_providers.dart';
 import '../state/share_providers.dart';
 import '../theme/brain_duel_theme.dart';
@@ -14,11 +15,11 @@ import '../widgets/bd_card.dart';
 import '../widgets/bd_stat_pill.dart';
 import '../widgets/score_summary.dart';
 
-class TriviaResultScreen extends StatelessWidget {
+class TriviaResultScreen extends ConsumerWidget {
   const TriviaResultScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final args = (ModalRoute.of(context)?.settings.arguments as Map?)?.cast<String, dynamic>() ?? {};
     final challengeResult = args['challengeResult'] as ChallengeResult?;
     if (challengeResult != null) {
@@ -30,14 +31,53 @@ class TriviaResultScreen extends StatelessWidget {
     final points = (args['points'] as int?) ?? (correct * 100);
     final startedAt = DateTime.tryParse(args['startedAt'] as String? ?? '');
     final timeTaken = startedAt == null ? const Duration(seconds: 0) : DateTime.now().difference(startedAt);
+    final triviaPackId = args['triviaPackId'] as String?;
+    final leaderboardJson = args['leaderboard'] as Map?;
+    final leaderboard = leaderboardJson == null
+        ? null
+        : SoloPackLeaderboard.fromJson(Map<String, dynamic>.from(leaderboardJson));
 
-    final participants = [
-      LeaderboardEntry(name: 'You', points: points, time: timeTaken, rank: 2),
-      const LeaderboardEntry(name: 'Renata M.', points: 1840, time: Duration(minutes: 1, seconds: 12), rank: 1),
-      const LeaderboardEntry(name: 'Mike S.', points: 1650, time: Duration(minutes: 1, seconds: 26), rank: 3),
-      const LeaderboardEntry(name: 'John M.', points: 1240, time: Duration(minutes: 1, seconds: 45), rank: 4),
-      const LeaderboardEntry(name: 'Dinny K.', points: 1180, time: Duration(minutes: 1, seconds: 54), rank: 5),
-    ]..sort((a, b) => a.rank.compareTo(b.rank));
+    final participants = leaderboard == null
+        ? [
+            LeaderboardEntry(name: 'You', points: points, time: timeTaken, rank: 2),
+            const LeaderboardEntry(
+              name: 'Renata M.',
+              points: 1840,
+              time: Duration(minutes: 1, seconds: 12),
+              rank: 1,
+            ),
+            const LeaderboardEntry(
+              name: 'Mike S.',
+              points: 1650,
+              time: Duration(minutes: 1, seconds: 26),
+              rank: 3,
+            ),
+            const LeaderboardEntry(
+              name: 'John M.',
+              points: 1240,
+              time: Duration(minutes: 1, seconds: 45),
+              rank: 4,
+            ),
+            const LeaderboardEntry(
+              name: 'Dinny K.',
+              points: 1180,
+              time: Duration(minutes: 1, seconds: 54),
+              rank: 5,
+            ),
+          ]..sort((a, b) => a.rank.compareTo(b.rank))
+        : leaderboard.entries.map((entry) {
+            final isYou = entry.rank == leaderboard.userRank;
+            final duration = entry.durationSeconds == null
+                ? const Duration(seconds: 0)
+                : Duration(seconds: entry.durationSeconds!);
+            return LeaderboardEntry(
+              name: isYou ? 'You' : 'Player ${entry.rank}',
+              points: entry.score,
+              time: duration,
+              rank: entry.rank,
+            );
+          }).toList()
+          ..sort((a, b) => a.rank.compareTo(b.rank));
 
     return BDAppScaffold(
       title: 'Scoreboard',
@@ -114,11 +154,14 @@ class TriviaResultScreen extends StatelessWidget {
                       label: 'Share Results',
                       icon: Icons.share,
                       isExpanded: true,
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Share hook ready for integration.')),
-                        );
-                      },
+                      onPressed: triviaPackId == null || triviaPackId.isEmpty
+                          ? null
+                          : () => ref.read(shareServiceProvider).shareTriviaPack(
+                                context: context,
+                                triviaPackId: triviaPackId,
+                                topicId: categoryId,
+                                score: points,
+                              ),
                     ),
                     const SizedBox(height: 10),
                     BDSecondaryButton(

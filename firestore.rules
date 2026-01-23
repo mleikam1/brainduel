@@ -92,5 +92,30 @@ service cloud.firestore {
       // No client writes — backend/Admin SDK only
       allow write: if false;
     }
+
+    /* =========================
+       Trivia Packs
+       ========================= */
+
+    match /triviaPacks/{packId} {
+      // Public read for shared pack deep links
+      allow read: if true;
+      allow write: if false;
+
+      match /scores/{scoreUid} {
+        allow read: if isSignedIn();
+        allow create, update: if isOwner(scoreUid)
+          && request.resource.data.uid == scoreUid
+          && request.resource.data.keys().hasOnly([
+            "uid",
+            "score",
+            "maxScore",
+            "correct",
+            "durationSeconds",
+            "completedAt"
+          ]);
+        allow delete: if false;
+      }
+    }
   }
 }

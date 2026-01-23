@@ -5,12 +5,14 @@ class GameSession {
   final String topicId;
   final List<GameQuestion> questionsSnapshot;
   final GameSelectionMeta? selectionMeta;
+  final String? triviaPackId;
 
   const GameSession({
     required this.gameId,
     required this.topicId,
     required this.questionsSnapshot,
     this.selectionMeta,
+    this.triviaPackId,
   });
 
   factory GameSession.fromJson(Map<String, dynamic> json) {
@@ -30,6 +32,7 @@ class GameSession {
       topicId: topicId as String,
       questionsSnapshot: questions,
       selectionMeta: selectionMeta,
+      triviaPackId: json['triviaPackId'] as String?,
     );
   }
 }

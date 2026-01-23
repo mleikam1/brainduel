@@ -7,6 +7,14 @@
         { "fieldPath": "categoryId", "order": "ASCENDING" },
         { "fieldPath": "difficulty", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "scores",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "score", "order": "DESCENDING" },
+        { "fieldPath": "completedAt", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

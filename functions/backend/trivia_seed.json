@@ -1103,6 +1103,72 @@
           "correctIndex": 0,
           "difficulty": "hard"
         }]
+    },
+    {
+      "id": "sports",
+      "displayName": "Sports",
+      "questions": [
+        {
+          "prompt": "How many players are on the field for one soccer team during regulation play?",
+          "choices": ["9", "10", "11", "12"],
+          "correctIndex": 2,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "In basketball, how many points is a free throw worth?",
+          "choices": ["1", "2", "3", "4"],
+          "correctIndex": 0,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "Which sport uses the terms 'strike' and 'ball'?",
+          "choices": ["Baseball", "Hockey", "Tennis", "Rugby"],
+          "correctIndex": 0,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "How long is a standard NFL field including end zones?",
+          "choices": ["100 yards", "110 yards", "120 yards", "130 yards"],
+          "correctIndex": 2,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "What is the term for three strikes in bowling?",
+          "choices": ["Spare", "Turkey", "Ace", "Hat trick"],
+          "correctIndex": 1,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "How many players are on a volleyball team on the court?",
+          "choices": ["4", "5", "6", "7"],
+          "correctIndex": 2,
+          "difficulty": "easy"
+        },
+        {
+          "prompt": "In tennis, what is a score of 40-40 called?",
+          "choices": ["Deuce", "Advantage", "Love", "Match point"],
+          "correctIndex": 0,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "How many periods are in a standard ice hockey game?",
+          "choices": ["2", "3", "4", "5"],
+          "correctIndex": 1,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "Which country hosts the Tour de France?",
+          "choices": ["Spain", "Italy", "France", "Belgium"],
+          "correctIndex": 2,
+          "difficulty": "medium"
+        },
+        {
+          "prompt": "What is the maximum score possible in a single frame of bowling?",
+          "choices": ["20", "25", "30", "40"],
+          "correctIndex": 2,
+          "difficulty": "medium"
+        }
+      ]
     }
   ]
 }
