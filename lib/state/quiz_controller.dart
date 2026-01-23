@@ -239,6 +239,24 @@ class QuizController extends StateNotifier<TriviaGameState> {
     );
   }
 
+  void _logBackendStartEvent({
+    required String event,
+    required String topicId,
+    String? code,
+    String? message,
+    Object? details,
+  }) {
+    ref.read(analyticsServiceProvider).logEvent(
+      event,
+      parameters: {
+        'topicId': topicId,
+        if (code != null) 'code': code,
+        if (message != null) 'message': message,
+        if (details != null) 'details': details.toString(),
+      },
+    );
+  }
+
   void _logGameBlockedNoQuestions({
     required String topicId,
     Object? details,
@@ -341,10 +359,65 @@ class QuizController extends StateNotifier<TriviaGameState> {
         return;
       }
       final analytics = ref.read(analyticsServiceProvider);
-      final session = await ref.read(gameFunctionsServiceProvider).createGame(
+      GameSession session;
+      try {
+        session = await ref.read(gameFunctionsServiceProvider).createGame(
+              topicId: trimmedCategoryId,
+              mode: 'solo',
+            );
+      } on GameFunctionsException catch (e, st) {
+        debugPrint(
+          'QuizController startGame createGame error: code=${e.code} message=${e.message} details=${e.details}',
+        );
+        debugPrintStack(stackTrace: st);
+        _logGameFailed('start', code: e.code);
+        if (_isNoQuestionsError(e)) {
+          _logBackendStartEvent(
+            event: 'backend_no_questions',
             topicId: trimmedCategoryId,
-            mode: 'solo',
+            code: e.code,
+            message: e.message,
+            details: e.details,
           );
+          _logGameBlockedNoQuestions(
+            topicId: trimmedCategoryId,
+            details: e.details,
+          );
+          state = _markGameStartFailure(_messageForGameError(e));
+          return;
+        }
+        if (_isAlreadyCompletedError(e)) {
+          state = _markAlreadyCompleted(
+            state.copyWith(loading: false),
+            message: _messageForGameError(e),
+          );
+          return;
+        }
+        try {
+          session = await ref
+              .read(quizRepositoryProvider)
+              .fetchSoloQuiz(categoryId: trimmedCategoryId);
+          _logBackendStartEvent(
+            event: 'backend_fallback_used',
+            topicId: trimmedCategoryId,
+            code: e.code,
+            message: e.message,
+            details: e.details,
+          );
+        } catch (fallbackError, fallbackSt) {
+          debugPrint('QuizController startGame fallback error: $fallbackError');
+          debugPrintStack(stackTrace: fallbackSt);
+          _logBackendStartEvent(
+            event: 'backend_unrecoverable_error',
+            topicId: trimmedCategoryId,
+            code: e.code,
+            message: e.message,
+            details: e.details,
+          );
+          state = _markGameStartFailure(_formatError(fallbackError));
+          return;
+        }
+      }
       // Fairness requires server-generated question snapshots so clients cannot reshuffle or peek at answers.
       if (_completedGameIds.contains(session.gameId)) {
         state = state.copyWith(
@@ -374,26 +447,8 @@ class QuizController extends StateNotifier<TriviaGameState> {
     } catch (e, st) {
       debugPrint('QuizController startGame error: $e');
       debugPrintStack(stackTrace: st);
-      if (e is GameFunctionsException) {
-        _logGameFailed('start', code: e.code);
-        if (_isNoQuestionsError(e)) {
-          _logGameBlockedNoQuestions(
-            topicId: trimmedCategoryId,
-            details: e.details,
-          );
-        }
-        if (_isAlreadyCompletedError(e)) {
-          state = _markAlreadyCompleted(
-            state.copyWith(loading: false),
-            message: _messageForGameError(e),
-          );
-        } else {
-          state = _markGameStartFailure(_messageForGameError(e));
-        }
-      } else {
-        _logGameFailed('start');
-        state = _markGameStartFailure(_formatError(e));
-      }
+      _logGameFailed('start');
+      state = _markGameStartFailure(_formatError(e));
     } finally {
       _isStarting = false;
     }
