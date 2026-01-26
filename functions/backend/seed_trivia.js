@@ -10,8 +10,8 @@
  * - No duplicate questions: same prompt in same topic maps to same doc ID.
  * - Uses batched writes (<= 450 ops per batch).
  *
- * Required env var:
- *   GOOGLE_APPLICATION_CREDENTIALS=/absolute/path/to/serviceAccountKey.json
+ * Credentials:
+ *   Uses Application Default Credentials (ADC) from gcloud or environment.
  *
  * Usage:
  *   node functions/backend/seed_trivia.js functions/backend/trivia_seed.json
@@ -22,12 +22,6 @@ const path = require("path");
 const crypto = require("crypto");
 
 const admin = require("firebase-admin");
-
-function requireEnv(name) {
-  const v = process.env[name];
-  if (!v) throw new Error(`Missing required env var: ${name}`);
-  return v;
-}
 
 function sha1(input) {
   return crypto.createHash("sha1").update(input).digest("hex");
@@ -106,11 +100,7 @@ async function main() {
   const seedPath = path.resolve(process.cwd(), inputArg);
   assert(fs.existsSync(seedPath), `Seed file not found: ${seedPath}`);
 
-  // Ensure credentials are available
-  const credsPath = requireEnv("GOOGLE_APPLICATION_CREDENTIALS");
-  assert(fs.existsSync(credsPath), `Service account file not found: ${credsPath}`);
-
-  // Init Admin SDK using the service account from env var
+  // Init Admin SDK using Application Default Credentials (ADC)
   if (admin.apps.length === 0) {
     admin.initializeApp({
       credential: admin.credential.applicationDefault(),
