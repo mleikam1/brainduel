@@ -1,7 +1,12 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions/logger";
 import * as admin from "firebase-admin";
-import type { FirebaseFirestore } from "firebase-admin";
+import { getFirestore } from "firebase-admin/firestore";
+import type {
+  DocumentSnapshot,
+  Firestore,
+  QueryDocumentSnapshot,
+} from "firebase-admin/firestore";
 import { emitQuizAnalyticsEvent } from "./analytics";
 import {
   buildTopicCandidates,
@@ -12,7 +17,7 @@ import {
 } from "./triviaQuestions";
 
 admin.initializeApp();
-const db = admin.firestore();
+const db = getFirestore();
 
 /**
  * Firestore Question document shape
@@ -137,7 +142,7 @@ function nowTimestamp(): admin.firestore.Timestamp {
 }
 
 function normalizeQuestionSnapshot(
-  doc: FirebaseFirestore.DocumentSnapshot
+  doc: DocumentSnapshot
 ): SharedQuizSnapshotQuestion {
   const data = doc.data() as QuestionDoc;
   return {
@@ -149,16 +154,16 @@ function normalizeQuestionSnapshot(
 }
 
 function dedupeDocs(
-  docs: FirebaseFirestore.QueryDocumentSnapshot[]
-): FirebaseFirestore.QueryDocumentSnapshot[] {
-  const unique = new Map<string, FirebaseFirestore.QueryDocumentSnapshot>();
+  docs: QueryDocumentSnapshot[]
+): QueryDocumentSnapshot[] {
+  const unique = new Map<string, QueryDocumentSnapshot>();
   docs.forEach((doc) => unique.set(doc.id, doc));
   return Array.from(unique.values());
 }
 
 async function resolveQuestionsSnapshot(
   questionIds: string[],
-  db: FirebaseFirestore.Firestore
+  db: Firestore
 ): Promise<SharedQuizSnapshotQuestion[]> {
   if (questionIds.length === 0) {
     return [];
@@ -166,7 +171,9 @@ async function resolveQuestionsSnapshot(
   const questionRefs = questionIds.map((id) => db.doc(`questions/${id}`));
   const questionDocs = await db.getAll(...questionRefs);
   const questionById = new Map(
-    questionDocs.filter((doc) => doc.exists).map((doc) => [doc.id, doc])
+    questionDocs
+      .filter((doc): doc is QueryDocumentSnapshot => doc.exists)
+      .map((doc) => [doc.id, doc])
   );
   return questionIds.map((id) => {
     const doc = questionById.get(id);
@@ -476,7 +483,7 @@ export const loadGame = onCall(async (request) => {
     const questionRefs = questionIds.map((id) => db.doc(`questions/${id}`));
     const questionDocs = await db.getAll(...questionRefs);
     questionsSnapshot = questionDocs
-      .filter((doc) => doc.exists)
+      .filter((doc): doc is QueryDocumentSnapshot => doc.exists)
       .map(normalizeQuestionSnapshot);
   }
 
@@ -511,7 +518,7 @@ export const createSharedQuiz = onCall(async (request) => {
 
   const resolved = await resolveTopicId(db, topicId, categoryId, topic);
   let selectedIds: string[] = [];
-  let selectedDocs: FirebaseFirestore.DocumentSnapshot[] = [];
+  let selectedDocs: QueryDocumentSnapshot[] = [];
   let poolSize = 0;
 
   if (Array.isArray(questionIds) && questionIds.length > 0) {
@@ -520,7 +527,9 @@ export const createSharedQuiz = onCall(async (request) => {
       db.doc(`questions/${id}`)
     );
     const docs = await db.getAll(...questionRefs);
-    const existingDocs = docs.filter((doc) => doc.exists);
+    const existingDocs = docs.filter(
+      (doc): doc is QueryDocumentSnapshot => doc.exists
+    );
     if (existingDocs.length !== uniqueIds.length) {
       throw new HttpsError(
         "failed-precondition",
