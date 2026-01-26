@@ -1,6 +1,6 @@
 import { HttpsError } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
-import type { FirebaseFirestore } from "firebase-admin";
+import type { Firestore, QueryDocumentSnapshot } from "firebase-admin/firestore";
 
 export interface TopicResolution {
   canonicalTopicId: string;
@@ -14,7 +14,7 @@ export interface TopicResolution {
 }
 
 export interface QuestionFetchResult {
-  docs: FirebaseFirestore.QueryDocumentSnapshot[];
+  docs: QueryDocumentSnapshot[];
   questionIds: string[];
   totalQuestions: number;
   topicId: string;
@@ -24,7 +24,7 @@ export interface TriviaPackGenerationResult {
   packId: string;
   topicId: string;
   questionIds: string[];
-  questionDocs: FirebaseFirestore.QueryDocumentSnapshot[];
+  questionDocs: QueryDocumentSnapshot[];
   appliedFilter: string;
   appliedValue?: string;
   totalQuestions: number;
@@ -34,7 +34,7 @@ export interface TriviaPackCreationResult {
   packId: string;
   topicId: string;
   questionIds: string[];
-  questionDocs: FirebaseFirestore.QueryDocumentSnapshot[];
+  questionDocs: QueryDocumentSnapshot[];
 }
 
 export function normalizeTopicKey(value: string): string {
@@ -73,7 +73,7 @@ export function buildTopicCandidates(resolved: TopicResolution): string[] {
 }
 
 export async function resolveTopicId(
-  db: FirebaseFirestore.Firestore,
+  db: Firestore,
   topicId?: string,
   categoryId?: string,
   topic?: string
@@ -192,7 +192,7 @@ export function selectRandomDocs<T>(items: T[], limit?: number): T[] {
 }
 
 export async function getRandomQuestionsForTopic(
-  db: FirebaseFirestore.Firestore,
+  db: Firestore,
   options: {
     topicId: string;
     limit?: number;
@@ -214,7 +214,10 @@ export async function getRandomQuestionsForTopic(
       topicId,
     };
   }
-  const selectedDocs = selectRandomDocs(allDocs, limit);
+  const selectedDocs: QueryDocumentSnapshot[] = selectRandomDocs(
+    allDocs,
+    limit
+  );
   return {
     docs: selectedDocs,
     questionIds: selectedDocs.map((doc) => doc.id),
@@ -224,7 +227,7 @@ export async function getRandomQuestionsForTopic(
 }
 
 export async function generateTriviaPack(
-  db: FirebaseFirestore.Firestore,
+  db: Firestore,
   options: {
     topicId: string;
     questionCount: number;
@@ -270,10 +273,10 @@ export async function generateTriviaPack(
 }
 
 export async function createTriviaPackFromDocs(
-  db: FirebaseFirestore.Firestore,
+  db: Firestore,
   options: {
     topicId: string;
-    questionDocs: FirebaseFirestore.QueryDocumentSnapshot[];
+    questionDocs: QueryDocumentSnapshot[];
     createdBy: string;
   }
 ): Promise<TriviaPackCreationResult> {
