@@ -13,7 +13,6 @@ import {
   createTriviaPackFromDocs,
   getRandomQuestionsForTopic,
   resolveTopicId,
-  selectRandomDocs,
 } from "./triviaQuestions";
 
 admin.initializeApp();
@@ -153,14 +152,6 @@ function normalizeQuestionSnapshot(
   };
 }
 
-function dedupeDocs(
-  docs: QueryDocumentSnapshot[]
-): QueryDocumentSnapshot[] {
-  const unique = new Map<string, QueryDocumentSnapshot>();
-  docs.forEach((doc) => unique.set(doc.id, doc));
-  return Array.from(unique.values());
-}
-
 async function resolveQuestionsSnapshot(
   questionIds: string[],
   db: Firestore
@@ -283,74 +274,50 @@ export const createGame = onCall(async (request) => {
     mappingIssues = resolved.mappingIssues;
 
     appliedCandidates = buildTopicCandidates(resolved);
-    const candidates = appliedCandidates.length > 0 ? appliedCandidates : [canonicalTopicId];
-    const limitedCandidates = candidates.slice(0, 10);
-    const topicExists = (await db.doc(`topics/${canonicalTopicId}`).get()).exists;
-    const categoryExists = (await db.doc(`categories/${canonicalTopicId}`).get()).exists;
-
-    const topicQuery =
-      limitedCandidates.length > 1
-        ? db.collection("questions").where("topicId", "in", limitedCandidates)
-        : db.collection("questions").where("topicId", "==", limitedCandidates[0]);
-    const categoryQuery =
-      limitedCandidates.length > 1
-        ? db.collection("questions").where("categoryId", "in", limitedCandidates)
-        : db.collection("questions").where("categoryId", "==", limitedCandidates[0]);
-
-    const [topicQuerySnap, categoryQuerySnap] = await Promise.all([
-      topicQuery.get(),
-      categoryQuery.get(),
-    ]);
-
+    const questionResult = await getRandomQuestionsForTopic(db, {
+      topicId: canonicalTopicId,
+      limit: requestedSize,
+    });
+    const selectedDocs = questionResult.docs;
+    questionIds = selectedDocs.map((doc) => doc.id);
+    selectionSize = selectedDocs.length;
+    poolSize = questionResult.eligibleQuestions;
     appliedFilters = {
-      topicId: limitedCandidates,
-      categoryId: limitedCandidates,
+      topicId: questionResult.appliedFilters.topicIdCandidates,
+      categoryId: questionResult.appliedFilters.categoryId ?? [],
     };
 
-    const questionDocs = dedupeDocs([
-      ...topicQuerySnap.docs,
-      ...categoryQuerySnap.docs,
-    ]);
-    poolSize = questionDocs.length;
-
     logger.info("createGame question pool", {
-      topicId: canonicalTopicId,
+      topicId: questionResult.normalizedTopicId,
       inputTopicId: rawTopicId,
       resolvedFrom,
       mappingIssues,
-      topicExists,
-      categoryExists,
-      appliedCandidates: limitedCandidates,
-      topicQueryCount: topicQuerySnap.size,
-      categoryQueryCount: categoryQuerySnap.size,
-      poolSize,
+      appliedCandidates: questionResult.appliedFilters.topicIdCandidates,
+      appliedFilters,
+      poolSize: questionResult.totalQuestions,
+      eligibleSize: questionResult.eligibleQuestions,
     });
 
-    if (poolSize < requestedSize) {
+    if (questionResult.eligibleQuestions < requestedSize) {
       logger.warn("createGame insufficient questions for topic", {
-        topicId: canonicalTopicId,
+        topicId: questionResult.normalizedTopicId,
         inputTopicId: rawTopicId,
-        poolSize,
+        poolSize: questionResult.eligibleQuestions,
         requestedSize,
         appliedFilters,
       });
       throw new HttpsError(
         "failed-precondition",
-        `Not enough questions for topic ${canonicalTopicId}. Found ${poolSize}, need ${requestedSize}.`,
+        `Not enough questions for topic ${questionResult.normalizedTopicId}. Found ${questionResult.eligibleQuestions}, need ${requestedSize}.`,
         {
           code: "INSUFFICIENT_QUESTIONS",
-          topicId: canonicalTopicId,
+          topicId: questionResult.normalizedTopicId,
           inputTopicId: rawTopicId,
-          poolSize,
           requestedSize,
-          appliedFilters,
+          poolSize: questionResult.eligibleQuestions,
         }
       );
     }
-
-    const selectedDocs = selectRandomDocs(questionDocs, requestedSize);
-    questionIds = selectedDocs.map((doc) => doc.id);
-    selectionSize = selectedDocs.length;
 
     const packResult = await createTriviaPackFromDocs(db, {
       topicId: canonicalTopicId,
@@ -564,6 +531,7 @@ export const createSharedQuiz = onCall(async (request) => {
   } else {
     const questionResult = await getRandomQuestionsForTopic(db, {
       topicId: resolved.canonicalTopicId,
+      categoryId: resolved.inputCategoryId,
       limit: quizSize,
     });
     const questionDocs = questionResult.docs;
@@ -579,7 +547,7 @@ export const createSharedQuiz = onCall(async (request) => {
           inputTopic: resolved.inputTopic,
           resolvedFrom: resolved.resolvedFrom,
           mappingIssues: resolved.mappingIssues,
-          totalQuestions: 0,
+          totalQuestions: questionResult.totalQuestions,
           collection: "questions",
           candidateValues: buildTopicCandidates(resolved),
           appliedFilter: "topicId",
@@ -588,11 +556,17 @@ export const createSharedQuiz = onCall(async (request) => {
     }
 
     const poolIds = questionDocs.map((doc) => doc.id);
-    poolSize = questionResult.totalQuestions;
-    if (questionResult.totalQuestions < quizSize) {
+    poolSize = questionResult.eligibleQuestions;
+    if (questionResult.eligibleQuestions < quizSize) {
       throw new HttpsError(
         "failed-precondition",
-        "Not enough questions to create shared quiz"
+        `Not enough questions for topic ${questionResult.normalizedTopicId}. Found ${questionResult.eligibleQuestions}, need ${quizSize}.`,
+        {
+          code: "INSUFFICIENT_QUESTIONS",
+          topicId: questionResult.normalizedTopicId,
+          requestedSize: quizSize,
+          poolSize: questionResult.eligibleQuestions,
+        }
       );
     }
 

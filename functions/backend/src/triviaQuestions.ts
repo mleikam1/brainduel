@@ -1,4 +1,5 @@
 import { HttpsError } from "firebase-functions/v2/https";
+import { logger } from "firebase-functions/logger";
 import * as admin from "firebase-admin";
 import type { Firestore, QueryDocumentSnapshot } from "firebase-admin/firestore";
 
@@ -17,7 +18,13 @@ export interface QuestionFetchResult {
   docs: QueryDocumentSnapshot[];
   questionIds: string[];
   totalQuestions: number;
+  eligibleQuestions: number;
   topicId: string;
+  normalizedTopicId: string;
+  appliedFilters: {
+    topicIdCandidates: string[];
+    categoryId?: string;
+  };
 }
 
 export interface TriviaPackGenerationResult {
@@ -46,6 +53,22 @@ export function normalizeTopicKey(value: string): string {
     .replace(/_+/g, "_");
 }
 
+function normalizeComparableId(value: string | undefined): string {
+  return String(value || "").trim().toLowerCase();
+}
+
+function ensureValidTopicId(inputTopicId: string | undefined): {
+  trimmedTopicId: string;
+  normalizedTopicId: string;
+} {
+  const trimmedTopicId = typeof inputTopicId === "string" ? inputTopicId.trim() : "";
+  if (!trimmedTopicId) {
+    throw new HttpsError("invalid-argument", "Missing topicId");
+  }
+  const normalizedTopicId = normalizeComparableId(trimmedTopicId);
+  return { trimmedTopicId, normalizedTopicId };
+}
+
 function collectCandidateValues(values: Array<string | undefined>): string[] {
   const set = new Set<string>();
   for (const value of values) {
@@ -59,6 +82,10 @@ function collectCandidateValues(values: Array<string | undefined>): string[] {
     }
   }
   return Array.from(set);
+}
+
+function buildTopicQueryCandidates(topicId: string): string[] {
+  return collectCandidateValues([topicId, normalizeComparableId(topicId)]);
 }
 
 export function buildTopicCandidates(resolved: TopicResolution): string[] {
@@ -195,34 +222,79 @@ export async function getRandomQuestionsForTopic(
   db: Firestore,
   options: {
     topicId: string;
+    categoryId?: string;
     limit?: number;
   }
 ): Promise<QuestionFetchResult> {
-  const { topicId, limit } = options;
-  // Questions are stored with string topicId/categoryId fields; query only topicId for gameplay selection.
-  const querySnap = await db
-    .collection("questions")
-    .where("topicId", "==", topicId)
-    .get();
+  const { topicId, limit, categoryId } = options;
+  const { trimmedTopicId, normalizedTopicId } = ensureValidTopicId(topicId);
+  const normalizedCategoryId = normalizeComparableId(categoryId);
+  const topicCandidates = buildTopicQueryCandidates(trimmedTopicId);
+  const limitedCandidates = topicCandidates.slice(0, 10);
+  const topicQuery =
+    limitedCandidates.length > 1
+      ? db.collection("questions").where("topicId", "in", limitedCandidates)
+      : db.collection("questions").where("topicId", "==", limitedCandidates[0]);
+  const querySnap = await topicQuery.get();
   const allDocs = querySnap.docs;
   const totalQuestions = allDocs.length;
-  if (totalQuestions === 0) {
+  const eligibleDocs = allDocs.filter((doc) => {
+    const data = doc.data() as { categoryId?: string; topicId?: string };
+    const docTopicId = normalizeComparableId(data.topicId);
+    if (docTopicId && docTopicId !== normalizedTopicId) {
+      return false;
+    }
+    if (!normalizedCategoryId) {
+      return true;
+    }
+    const docCategoryId = normalizeComparableId(data.categoryId);
+    if (!docCategoryId) {
+      return true;
+    }
+    return docCategoryId === normalizedCategoryId;
+  });
+  const eligibleQuestions = eligibleDocs.length;
+
+  logger.info("triviaQuestions pool summary", {
+    topicId: normalizedTopicId,
+    inputTopicId: trimmedTopicId,
+    appliedFilters: {
+      topicIdCandidates: limitedCandidates,
+      categoryId: normalizedCategoryId || undefined,
+    },
+    poolSize: totalQuestions,
+    eligibleSize: eligibleQuestions,
+  });
+
+  if (eligibleQuestions === 0) {
     return {
       docs: [],
       questionIds: [],
       totalQuestions,
-      topicId,
+      eligibleQuestions,
+      topicId: trimmedTopicId,
+      normalizedTopicId,
+      appliedFilters: {
+        topicIdCandidates: limitedCandidates,
+        categoryId: normalizedCategoryId || undefined,
+      },
     };
   }
   const selectedDocs: QueryDocumentSnapshot[] = selectRandomDocs(
-    allDocs,
+    eligibleDocs,
     limit
   );
   return {
     docs: selectedDocs,
     questionIds: selectedDocs.map((doc) => doc.id),
     totalQuestions,
-    topicId,
+    eligibleQuestions,
+    topicId: trimmedTopicId,
+    normalizedTopicId,
+    appliedFilters: {
+      topicIdCandidates: limitedCandidates,
+      categoryId: normalizedCategoryId || undefined,
+    },
   };
 }
 
@@ -230,21 +302,31 @@ export async function generateTriviaPack(
   db: Firestore,
   options: {
     topicId: string;
+    categoryId?: string;
     questionCount: number;
     createdBy: string;
   }
 ): Promise<TriviaPackGenerationResult> {
-  const trimmedTopicId = options.topicId.trim();
-  if (!trimmedTopicId) {
-    throw new HttpsError("invalid-argument", "Missing topicId");
-  }
+  const { trimmedTopicId, normalizedTopicId } = ensureValidTopicId(
+    options.topicId
+  );
   const questionResult = await getRandomQuestionsForTopic(db, {
     topicId: trimmedTopicId,
+    categoryId: options.categoryId,
     limit: options.questionCount,
   });
   const questionDocs = questionResult.docs;
-  if (questionDocs.length === 0) {
-    throw new HttpsError("failed-precondition", "No questions available");
+  if (questionResult.eligibleQuestions < options.questionCount) {
+    throw new HttpsError(
+      "failed-precondition",
+      `Not enough questions for topic ${normalizedTopicId}. Found ${questionResult.eligibleQuestions}, need ${options.questionCount}.`,
+      {
+        code: "INSUFFICIENT_QUESTIONS",
+        topicId: normalizedTopicId,
+        requestedSize: options.questionCount,
+        poolSize: questionResult.eligibleQuestions,
+      }
+    );
   }
 
   const selectedDocs = questionDocs;
