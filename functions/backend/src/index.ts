@@ -358,11 +358,12 @@ export const createGame = onCall(async (request) => {
       limit: requestedSize,
     });
     const selectedDocs = questionResult.docs;
+    const appliedCandidates = questionResult.appliedFilters.topicIdCandidates;
     questionIds = selectedDocs.map((doc) => doc.id);
     selectionSize = selectedDocs.length;
     poolSize = questionResult.eligibleQuestions;
     appliedFilters = {
-      topicId: questionResult.appliedFilters.topicIdCandidates,
+      topicId: appliedCandidates,
       categoryId: questionResult.appliedFilters.categoryId ?? [],
     };
 
@@ -371,7 +372,7 @@ export const createGame = onCall(async (request) => {
       inputTopicId: rawTopicId,
       resolvedFrom,
       mappingIssues,
-      appliedCandidates: questionResult.appliedFilters.topicIdCandidates,
+      appliedCandidates,
       appliedFilters,
       poolSize: questionResult.totalQuestions,
       eligibleSize: questionResult.eligibleQuestions,
