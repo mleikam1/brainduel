@@ -17,7 +17,17 @@ class GameSession {
 
   factory GameSession.fromJson(Map<String, dynamic> json) {
     final rawQuestions = json['questionsSnapshot'] ?? json['questions'];
-    final questionsJson = (rawQuestions as List).cast<Map<String, dynamic>>();
+    if (rawQuestions is! List) {
+      throw StateError('Missing questions for game session payload.');
+    }
+    final questionsJson = List<Map<String, dynamic>>.from(
+      rawQuestions.map((question) {
+        if (question is! Map) {
+          throw StateError('Invalid question payload for game session.');
+        }
+        return Map<String, dynamic>.from(question);
+      }),
+    );
     final questions = questionsJson.map(GameQuestion.fromJson).toList();
     final topicId = json['topicId'] ?? json['categoryId'];
     if (topicId == null) {

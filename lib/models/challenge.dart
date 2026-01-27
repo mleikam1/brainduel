@@ -18,7 +18,15 @@ class ChallengeMetadata {
   });
 
   factory ChallengeMetadata.fromJson(Map<String, dynamic> json) {
-    final rulesJson = (json['rules'] as List?)?.cast<String>() ?? <String>[];
+    final rawRules = json['rules'];
+    List<String> rulesJson;
+    if (rawRules == null) {
+      rulesJson = <String>[];
+    } else if (rawRules is List) {
+      rulesJson = List<String>.from(rawRules);
+    } else {
+      throw StateError('Invalid challenge rules payload.');
+    }
     return ChallengeMetadata(
       id: json['id'] as String,
       title: json['title'] as String,
@@ -75,7 +83,18 @@ class ChallengeQuestion {
   });
 
   factory ChallengeQuestion.fromJson(Map<String, dynamic> json) {
-    final choicesJson = (json['choices'] as List).cast<Map<String, dynamic>>();
+    final rawChoices = json['choices'];
+    if (rawChoices is! List) {
+      throw StateError('Invalid challenge choices payload.');
+    }
+    final choicesJson = List<Map<String, dynamic>>.from(
+      rawChoices.map((choice) {
+        if (choice is! Map) {
+          throw StateError('Invalid challenge choice payload.');
+        }
+        return Map<String, dynamic>.from(choice);
+      }),
+    );
     final choices = choicesJson.map(ChallengeChoice.fromJson).toList();
     if (choices.length < 2) {
       throw FormatException('Challenge question ${json['id']} must have at least 2 choices.');
@@ -104,7 +123,18 @@ class ChallengeDefinition {
   });
 
   factory ChallengeDefinition.fromJson(Map<String, dynamic> json) {
-    final questionsJson = (json['questions'] as List).cast<Map<String, dynamic>>();
+    final rawQuestions = json['questions'];
+    if (rawQuestions is! List) {
+      throw StateError('Invalid challenge questions payload.');
+    }
+    final questionsJson = List<Map<String, dynamic>>.from(
+      rawQuestions.map((question) {
+        if (question is! Map) {
+          throw StateError('Invalid challenge question payload.');
+        }
+        return Map<String, dynamic>.from(question);
+      }),
+    );
     return ChallengeDefinition(
       metadata: ChallengeMetadata.fromJson(json),
       questions: questionsJson.map(ChallengeQuestion.fromJson).toList(),

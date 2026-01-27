@@ -53,7 +53,11 @@ class LocalSoloGameService {
       version: 1,
       fetcher: () => storage.downloadTextFile(packId),
     );
-    final decoded = json.decode(jsonText) as Map<String, dynamic>;
+    final decodedRaw = json.decode(jsonText);
+    if (decodedRaw is! Map) {
+      throw StateError('Invalid trivia pack payload.');
+    }
+    final decoded = Map<String, dynamic>.from(decodedRaw);
     final pack = TriviaPack.fromJson(decoded);
     if (pack.categoryId != categoryId) {
       throw StateError(

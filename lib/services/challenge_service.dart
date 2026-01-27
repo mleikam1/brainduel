@@ -120,7 +120,11 @@ class ChallengeService {
       version: 1,
       fetcher: () => storage.downloadTextFile(key),
     );
-    final decoded = json.decode(jsonText) as Map<String, dynamic>;
+    final decodedRaw = json.decode(jsonText);
+    if (decodedRaw is! Map) {
+      throw StateError('Invalid challenge payload.');
+    }
+    final decoded = Map<String, dynamic>.from(decodedRaw);
     return ChallengeDefinition.fromJson(decoded);
   }
 

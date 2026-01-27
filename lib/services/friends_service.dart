@@ -40,8 +40,13 @@ class FriendsService {
     if (response.statusCode != 200) {
       throw Exception('Follow failed (${response.statusCode})');
     }
-    final payload = jsonDecode(response.body) as Map<String, dynamic>;
-    final friendJson = payload['friend'] as Map<String, dynamic>? ?? const {};
+    final payloadRaw = jsonDecode(response.body);
+    if (payloadRaw is! Map) {
+      throw StateError('Invalid friend payload.');
+    }
+    final payload = Map<String, dynamic>.from(payloadRaw);
+    final friendRaw = payload['friend'];
+    final friendJson = friendRaw is Map ? Map<String, dynamic>.from(friendRaw) : const {};
     return FriendProfile.fromJson(friendJson);
   }
 
@@ -56,8 +61,27 @@ class FriendsService {
     if (response.statusCode != 200) {
       throw Exception('Match failed (${response.statusCode})');
     }
-    final payload = jsonDecode(response.body) as Map<String, dynamic>;
-    final matches = (payload['matches'] as List? ?? const []).cast<Map<String, dynamic>>();
+    final payloadRaw = jsonDecode(response.body);
+    if (payloadRaw is! Map) {
+      throw StateError('Invalid contacts payload.');
+    }
+    final payload = Map<String, dynamic>.from(payloadRaw);
+    final rawMatches = payload['matches'];
+    List<Map<String, dynamic>> matches;
+    if (rawMatches == null) {
+      matches = const [];
+    } else if (rawMatches is List) {
+      matches = List<Map<String, dynamic>>.from(
+        rawMatches.map((match) {
+          if (match is! Map) {
+            throw StateError('Invalid friend match payload.');
+          }
+          return Map<String, dynamic>.from(match);
+        }),
+      );
+    } else {
+      throw StateError('Invalid friend matches payload.');
+    }
     return matches.map(FriendProfile.fromJson).toList();
   }
 
