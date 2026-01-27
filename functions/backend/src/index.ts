@@ -41,6 +41,11 @@ interface SharedQuizSnapshotQuestion {
   difficulty: string;
 }
 
+interface SerializedTimestamp {
+  seconds: number;
+  nanoseconds: number;
+}
+
 interface TriviaPackRecord {
   id: string;
   topicId: string;
@@ -57,6 +62,16 @@ interface TriviaPackResponse {
   topicId: string;
   questionIds: string[];
   createdAt: admin.firestore.Timestamp;
+  createdBy?: string;
+  questionsSnapshot: SharedQuizSnapshotQuestion[];
+}
+
+interface TriviaPackResponsePayload {
+  triviaPackId: string;
+  gameId?: string;
+  topicId: string;
+  questionIds: string[];
+  createdAt: SerializedTimestamp;
   createdBy?: string;
   questionsSnapshot: SharedQuizSnapshotQuestion[];
 }
@@ -80,6 +95,16 @@ interface TriviaPackLeaderboardEntry {
   completedAt: admin.firestore.Timestamp;
 }
 
+interface TriviaPackLeaderboardEntryPayload {
+  uid: string;
+  score: number;
+  maxScore: number;
+  correct?: number;
+  durationSeconds?: number;
+  rank: number;
+  completedAt: SerializedTimestamp;
+}
+
 interface SharedQuizResponse {
   quizId: string;
   categoryId: string;
@@ -91,10 +116,21 @@ interface SharedQuizResponse {
   questionsSnapshot: SharedQuizSnapshotQuestion[];
 }
 
+interface SharedQuizResponsePayload {
+  quizId: string;
+  categoryId: string;
+  quizSize: number;
+  questionDocIds: string[];
+  createdBy: string;
+  createdAt: SerializedTimestamp;
+  expiresAt: SerializedTimestamp;
+  questionsSnapshot: SharedQuizSnapshotQuestion[];
+}
+
 const SHARED_QUIZ_TTL_DAYS = 14;
 const sharedQuizCache = new Map<
   string,
-  { expiresAtMs: number; payload: SharedQuizResponse }
+  { expiresAtMs: number; payload: SharedQuizResponsePayload }
 >();
 
 /**
@@ -140,16 +176,36 @@ function nowTimestamp(): admin.firestore.Timestamp {
   return admin.firestore.Timestamp.fromDate(new Date());
 }
 
+function serializeTimestamp(
+  timestamp: admin.firestore.Timestamp
+): SerializedTimestamp {
+  return {
+    seconds: timestamp.seconds,
+    nanoseconds: timestamp.nanoseconds,
+  };
+}
+
+function serializeQuestionSnapshot(
+  snapshot: SharedQuizSnapshotQuestion
+): SharedQuizSnapshotQuestion {
+  return {
+    questionId: snapshot.questionId,
+    prompt: snapshot.prompt,
+    choices: Array.isArray(snapshot.choices) ? [...snapshot.choices] : [],
+    difficulty: snapshot.difficulty ?? "medium",
+  };
+}
+
 function normalizeQuestionSnapshot(
   doc: DocumentSnapshot
 ): SharedQuizSnapshotQuestion {
   const data = doc.data() as QuestionDoc;
-  return {
+  return serializeQuestionSnapshot({
     questionId: doc.id,
     prompt: data.prompt,
-    choices: data.choices,
+    choices: Array.isArray(data.choices) ? data.choices : [],
     difficulty: data.difficulty ?? "medium",
-  };
+  });
 }
 
 async function resolveQuestionsSnapshot(
@@ -182,30 +238,65 @@ function buildTriviaPackLeaderboard(
   entries: TriviaPackScoreEntry[],
   currentUid: string,
   limit = 10
-): { entries: TriviaPackLeaderboardEntry[]; userRank: number } {
+): { entries: TriviaPackLeaderboardEntryPayload[]; userRank: number } {
   const sorted = [...entries].sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score;
     return a.completedAt.toMillis() - b.completedAt.toMillis();
   });
   let userRank = -1;
-  const ranked = sorted.map((entry, index) => {
-    const rank = index + 1;
-    if (entry.uid === currentUid) {
-      userRank = rank;
+  const ranked: TriviaPackLeaderboardEntryPayload[] = sorted.map(
+    (entry, index) => {
+      const rank = index + 1;
+      if (entry.uid === currentUid) {
+        userRank = rank;
+      }
+      return {
+        uid: entry.uid,
+        score: entry.score,
+        maxScore: entry.maxScore,
+        correct: entry.correct,
+        durationSeconds: entry.durationSeconds,
+        rank,
+        completedAt: serializeTimestamp(entry.completedAt),
+      };
     }
-    return {
-      uid: entry.uid,
-      score: entry.score,
-      maxScore: entry.maxScore,
-      correct: entry.correct,
-      durationSeconds: entry.durationSeconds,
-      rank,
-      completedAt: entry.completedAt,
-    };
-  });
+  );
   return {
     entries: ranked.slice(0, limit),
     userRank,
+  };
+}
+
+function serializeSharedQuizResponse(
+  response: SharedQuizResponse
+): SharedQuizResponsePayload {
+  return {
+    quizId: response.quizId,
+    categoryId: response.categoryId,
+    quizSize: response.quizSize,
+    questionDocIds: [...response.questionDocIds],
+    createdBy: response.createdBy,
+    createdAt: serializeTimestamp(response.createdAt),
+    expiresAt: serializeTimestamp(response.expiresAt),
+    questionsSnapshot: response.questionsSnapshot.map(
+      serializeQuestionSnapshot
+    ),
+  };
+}
+
+function serializeTriviaPackResponse(
+  response: TriviaPackResponse
+): TriviaPackResponsePayload {
+  return {
+    triviaPackId: response.triviaPackId,
+    gameId: response.gameId,
+    topicId: response.topicId,
+    questionIds: [...response.questionIds],
+    createdAt: serializeTimestamp(response.createdAt),
+    createdBy: response.createdBy,
+    questionsSnapshot: response.questionsSnapshot.map(
+      serializeQuestionSnapshot
+    ),
   };
 }
 
@@ -346,12 +437,14 @@ export const createGame = onCall(async (request) => {
         ...data,
       };
     });
-    questionsSnapshot = allQuestions.map((q) => ({
-      questionId: q.id,
-      prompt: q.prompt,
-      choices: q.choices,
-      difficulty: q.difficulty ?? "medium",
-    }));
+    questionsSnapshot = allQuestions.map((q) =>
+      serializeQuestionSnapshot({
+        questionId: q.id,
+        prompt: q.prompt,
+        choices: q.choices,
+        difficulty: q.difficulty ?? "medium",
+      })
+    );
   }
 
   const gameId = db.collection("games").doc().id;
@@ -443,7 +536,7 @@ export const loadGame = onCall(async (request) => {
 
   const questionIds = Array.isArray(data.questionIds) ? data.questionIds : [];
   let questionsSnapshot = Array.isArray(data.questionsSnapshot)
-    ? data.questionsSnapshot
+    ? data.questionsSnapshot.map(serializeQuestionSnapshot)
     : [];
 
   if (questionsSnapshot.length === 0 && questionIds.length > 0) {
@@ -628,12 +721,13 @@ export const createSharedQuiz = onCall(async (request) => {
     questionsSnapshot,
   };
 
+  const payload = serializeSharedQuizResponse(response);
   sharedQuizCache.set(quizId, {
     expiresAtMs: expiresAt.toMillis(),
-    payload: response,
+    payload,
   });
 
-  return response;
+  return payload;
 });
 
 /**
@@ -672,8 +766,10 @@ export const getSharedQuiz = onCall(async (request) => {
     );
   }
 
-  let questionsSnapshot = data.questionsSnapshot;
-  if (!Array.isArray(questionsSnapshot) || questionsSnapshot.length === 0) {
+  let questionsSnapshot = Array.isArray(data.questionsSnapshot)
+    ? data.questionsSnapshot.map(serializeQuestionSnapshot)
+    : [];
+  if (questionsSnapshot.length === 0) {
     const questionRefs = questionDocIds.map((id) =>
       db.doc(`questions/${id}`)
     );
@@ -692,12 +788,13 @@ export const getSharedQuiz = onCall(async (request) => {
     questionsSnapshot,
   };
 
+  const payload = serializeSharedQuizResponse(response);
   sharedQuizCache.set(quizId, {
     expiresAtMs: expiresAt.toMillis(),
-    payload: response,
+    payload,
   });
 
-  return response;
+  return payload;
 });
 
 /**
@@ -738,10 +835,10 @@ export const getTriviaPack = onCall(async (request) => {
     questionsSnapshot,
   };
 
-  return {
+  return serializeTriviaPackResponse({
     ...response,
     gameId: packSnap.id,
-  };
+  });
 });
 
 /**
