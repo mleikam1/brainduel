@@ -85,16 +85,6 @@ interface TriviaPackScoreEntry {
   completedAt: admin.firestore.Timestamp;
 }
 
-interface TriviaPackLeaderboardEntry {
-  uid: string;
-  score: number;
-  maxScore: number;
-  correct?: number;
-  durationSeconds?: number;
-  rank: number;
-  completedAt: admin.firestore.Timestamp;
-}
-
 interface TriviaPackLeaderboardEntryPayload {
   uid: string;
   score: number;
@@ -325,7 +315,6 @@ export const createGame = onCall(async (request) => {
   let poolSize = 0;
   let selectionSize = 0;
   let usedExistingPack = false;
-  let appliedCandidates: string[] = [];
   let appliedFilters: Record<string, string[] | string> = {};
   let resolvedFrom = "unknown";
   let mappingIssues: string[] = [];
@@ -364,7 +353,6 @@ export const createGame = onCall(async (request) => {
     resolvedFrom = resolved.resolvedFrom;
     mappingIssues = resolved.mappingIssues;
 
-    appliedCandidates = buildTopicCandidates(resolved);
     const questionResult = await getRandomQuestionsForTopic(db, {
       topicId: canonicalTopicId,
       limit: requestedSize,
