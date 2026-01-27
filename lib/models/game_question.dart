@@ -12,10 +12,14 @@ class GameQuestion {
   });
 
   factory GameQuestion.fromJson(Map<String, dynamic> json) {
+    final rawChoices = json['choices'];
+    if (rawChoices is! List) {
+      throw StateError('Missing choices for game question payload.');
+    }
     return GameQuestion(
       id: json['questionId'] as String,
       prompt: json['prompt'] as String,
-      choices: List<String>.from(json['choices'] as List),
+      choices: List<String>.from(rawChoices),
       difficulty: json['difficulty'] as String,
     );
   }

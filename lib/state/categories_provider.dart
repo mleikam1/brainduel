@@ -39,12 +39,28 @@ final categoriesManifestProvider = FutureProvider<CategoriesManifest>((ref) asyn
     fetcher: () => storage.downloadTextFile('categories'),
   );
 
-  final decoded = json.decode(jsonText) as Map<String, dynamic>;
-  final list = (decoded['categories'] as List).cast<Map<String, dynamic>>();
+  final decodedRaw = json.decode(jsonText);
+  if (decodedRaw is! Map) {
+    throw StateError('Invalid categories manifest payload.');
+  }
+  final decoded = Map<String, dynamic>.from(decodedRaw);
+  final rawCategories = decoded['categories'];
+  if (rawCategories is! List) {
+    throw StateError('Invalid categories list payload.');
+  }
+  final list = List<Map<String, dynamic>>.from(
+    rawCategories.map((entry) {
+      if (entry is! Map) {
+        throw StateError('Invalid category payload.');
+      }
+      return Map<String, dynamic>.from(entry);
+    }),
+  );
   final categories = list.map(Category.fromJson).toList();
   final rawPackMap = decoded['packMap'];
-  final packMap = rawPackMap is Map<String, dynamic>
-      ? rawPackMap.map((key, value) => MapEntry(key, value.toString()))
+  final packMap = rawPackMap is Map
+      ? Map<String, dynamic>.from(rawPackMap)
+          .map((key, value) => MapEntry(key.toString(), value.toString()))
       : <String, String>{};
   return CategoriesManifest(categories: categories, packMap: packMap);
 });

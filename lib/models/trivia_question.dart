@@ -20,7 +20,18 @@ class TriviaQuestion {
   List<TriviaAnswer> get displayAnswers => sessionAnswers ?? answers;
 
   factory TriviaQuestion.fromJson(Map<String, dynamic> json) {
-    final answersJson = (json['answers'] as List).cast<Map<String, dynamic>>();
+    final rawAnswers = json['answers'];
+    if (rawAnswers is! List) {
+      throw StateError('Invalid trivia answers payload.');
+    }
+    final answersJson = List<Map<String, dynamic>>.from(
+      rawAnswers.map((answer) {
+        if (answer is! Map) {
+          throw StateError('Invalid trivia answer payload.');
+        }
+        return Map<String, dynamic>.from(answer);
+      }),
+    );
     final answers = answersJson.map(TriviaAnswer.fromJson).toList();
 
     // Minimal validation

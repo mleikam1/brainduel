@@ -12,7 +12,18 @@ class TriviaPack {
   });
 
   factory TriviaPack.fromJson(Map<String, dynamic> json) {
-    final qJson = (json['questions'] as List).cast<Map<String, dynamic>>();
+    final rawQuestions = json['questions'];
+    if (rawQuestions is! List) {
+      throw StateError('Invalid trivia pack questions payload.');
+    }
+    final qJson = List<Map<String, dynamic>>.from(
+      rawQuestions.map((question) {
+        if (question is! Map) {
+          throw StateError('Invalid trivia question payload.');
+        }
+        return Map<String, dynamic>.from(question);
+      }),
+    );
     return TriviaPack(
       categoryId: json['categoryId'] as String,
       version: (json['version'] as num?)?.toInt() ?? 1,

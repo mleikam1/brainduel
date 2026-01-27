@@ -46,7 +46,22 @@ class SoloPackLeaderboard {
   });
 
   factory SoloPackLeaderboard.fromJson(Map<String, dynamic> json) {
-    final entriesJson = (json['entries'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+    final rawEntries = json['entries'];
+    List<Map<String, dynamic>> entriesJson;
+    if (rawEntries == null) {
+      entriesJson = const [];
+    } else if (rawEntries is List) {
+      entriesJson = List<Map<String, dynamic>>.from(
+        rawEntries.map((entry) {
+          if (entry is! Map) {
+            throw StateError('Invalid leaderboard entry payload.');
+          }
+          return Map<String, dynamic>.from(entry);
+        }),
+      );
+    } else {
+      throw StateError('Invalid leaderboard entries payload.');
+    }
     return SoloPackLeaderboard(
       entries: entriesJson.map(SoloPackLeaderboardEntry.fromJson).toList(),
       userRank: (json['userRank'] as num?)?.toInt() ?? -1,
