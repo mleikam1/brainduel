@@ -28,6 +28,7 @@ class TriviaGameState {
   final bool isTimedOut;
   final bool isSubmitting;
   final bool hasAnsweredAny;
+  final bool hasSubmitted;
   final QuestionPhase phase;
   final DateTime? answerPhaseStartedAt;
   final DateTime? startedAt;
@@ -47,6 +48,7 @@ class TriviaGameState {
     required this.isTimedOut,
     required this.isSubmitting,
     required this.hasAnsweredAny,
+    required this.hasSubmitted,
     required this.phase,
     required this.answerPhaseStartedAt,
     required this.startedAt,
@@ -67,6 +69,7 @@ class TriviaGameState {
     isTimedOut: false,
     isSubmitting: false,
     hasAnsweredAny: false,
+    hasSubmitted: false,
     phase: QuestionPhase.reading,
     answerPhaseStartedAt: null,
     startedAt: null,
@@ -87,6 +90,7 @@ class TriviaGameState {
     bool? isTimedOut,
     bool? isSubmitting,
     bool? hasAnsweredAny,
+    bool? hasSubmitted,
     QuestionPhase? phase,
     DateTime? answerPhaseStartedAt,
     DateTime? startedAt,
@@ -106,6 +110,7 @@ class TriviaGameState {
       isTimedOut: isTimedOut ?? this.isTimedOut,
       isSubmitting: isSubmitting ?? this.isSubmitting,
       hasAnsweredAny: hasAnsweredAny ?? this.hasAnsweredAny,
+      hasSubmitted: hasSubmitted ?? this.hasSubmitted,
       phase: phase ?? this.phase,
       answerPhaseStartedAt: answerPhaseStartedAt ?? this.answerPhaseStartedAt,
       startedAt: startedAt ?? this.startedAt,
@@ -756,9 +761,19 @@ class QuizController extends StateNotifier<TriviaGameState> {
       state = _markAlreadyCompleted(state);
       return null;
     }
+    if (state.hasSubmitted) {
+      state = state.copyWith(
+        error: state.error ?? 'Your quiz submission is already being processed.',
+      );
+      return null;
+    }
     bool completionSucceeded = false;
     try {
-      state = state.copyWith(isSubmitting: true, error: null);
+      state = state.copyWith(
+        isSubmitting: true,
+        hasSubmitted: true,
+        error: null,
+      );
       final answers = session.questionsSnapshot.map((question) {
         final index = _selectedIndexByQuestionId[question.id] ?? 0;
         final boundedIndex = index.clamp(0, question.choices.length - 1);
