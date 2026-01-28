@@ -756,6 +756,7 @@ class QuizController extends StateNotifier<TriviaGameState> {
       state = _markAlreadyCompleted(state);
       return null;
     }
+    bool completionSucceeded = false;
     try {
       state = state.copyWith(isSubmitting: true, error: null);
       final answers = session.questionsSnapshot.map((question) {
@@ -767,10 +768,26 @@ class QuizController extends StateNotifier<TriviaGameState> {
           selectedIndex: boundedIndex,
         );
       }).toList();
-      final result = await ref.read(gameFunctionsServiceProvider).completeGame(
-            session.gameId,
-            answers,
+      late final ({int score, int maxScore, int? correct, int? total}) result;
+      try {
+        result = await ref.read(gameFunctionsServiceProvider).completeGame(
+              session.gameId,
+              answers,
+            );
+        completionSucceeded = true;
+      } on GameFunctionsException catch (e) {
+        if (e.code == 'failed-precondition') {
+          state = _markAlreadyCompleted(
+            state,
+            message: _messageForGameError(e),
           );
+          return null;
+        }
+        rethrow;
+      }
+      if (!completionSucceeded) {
+        return null;
+      }
       _completedGameIds.add(session.gameId);
       SoloPackLeaderboard? leaderboard;
       final triviaPackId = session.triviaPackId;
