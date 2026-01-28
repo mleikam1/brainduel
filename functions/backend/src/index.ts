@@ -1100,18 +1100,18 @@ export const submitSoloScore = onCall(async (request) => {
 export const completeGame = onCall(async (request) => {
   const uid = request.auth?.uid;
   const gameId = request.data?.gameId as string | undefined;
-  const answers = request.data?.answers as
-    | { questionId: string; selectedIndex: number }[]
-    | undefined;
+  const answers = Array.isArray(request.data?.answers)
+    ? (request.data?.answers as {
+        questionId: string;
+        selectedIndex: number;
+      }[])
+    : [];
 
   if (!uid) {
     throw new HttpsError("unauthenticated", "User must be authenticated");
   }
-  if (!gameId || !Array.isArray(answers)) {
-    throw new HttpsError(
-      "invalid-argument",
-      "gameId and answers are required"
-    );
+  if (!gameId) {
+    throw new HttpsError("not-found", "Game not found");
   }
 
   const gameRef = db.doc(`games/${gameId}`);
@@ -1125,19 +1125,24 @@ export const completeGame = onCall(async (request) => {
   if (!gameSnap.exists) {
     throw new HttpsError("not-found", "Game not found");
   }
-  if (!playerSnap.exists) {
-    throw new HttpsError("failed-precondition", "Player not registered");
+
+  const gameData = gameSnap.data() as {
+    createdByUid?: string;
+    completedAt?: admin.firestore.Timestamp | null;
+    questionIds?: string[];
+    topicId?: string;
+  };
+  if (gameData.createdByUid && gameData.createdByUid !== uid) {
+    throw new HttpsError("permission-denied", "UID mismatch");
   }
-  if (playerSnap.data()!.locked) {
-    throw new HttpsError(
-      "failed-precondition",
-      "Game already completed"
-    );
+  if (gameData.completedAt != null || playerSnap.data()?.locked) {
+    return { ok: true, alreadyCompleted: true };
   }
 
-  const gameData = gameSnap.data()!;
-  const questionIds: string[] = gameData.questionIds;
-  const topicId: string = gameData.topicId;
+  const questionIds: string[] = Array.isArray(gameData.questionIds)
+    ? gameData.questionIds
+    : [];
+  const topicId: string = gameData.topicId as string;
 
   const questionDocs = await Promise.all(
     questionIds.map((qid) => db.doc(`questions/${qid}`).get())
@@ -1165,13 +1170,24 @@ export const completeGame = onCall(async (request) => {
 
   const batch = db.batch();
 
-  batch.update(playerRef, {
-    completedAt: admin.firestore.FieldValue.serverTimestamp(),
-    score,
-    maxScore: questionIds.length,
-    answers: scoredAnswers,
-    locked: true,
-  });
+  batch.set(
+    playerRef,
+    {
+      completedAt: admin.firestore.FieldValue.serverTimestamp(),
+      score,
+      maxScore: questionIds.length,
+      answers: scoredAnswers,
+      locked: true,
+    },
+    { merge: true }
+  );
+  batch.set(
+    gameRef,
+    {
+      completedAt: admin.firestore.FieldValue.serverTimestamp(),
+    },
+    { merge: true }
+  );
 
   await batch.commit();
 
