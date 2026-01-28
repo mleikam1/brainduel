@@ -918,151 +918,76 @@ export const submitSoloScore = onCall(async (request) => {
 
   const scoreId = `${gameId}_${uid}`;
   const scoreRef = db.collection("soloScores").doc(scoreId);
-  const existing = await scoreRef.get();
-  if (existing.exists) {
-    logger.info("submitSoloScore duplicate score submission", {
-      gameId,
-      triviaPackId,
-      scoreId,
-      uid,
-    });
-    const existingData = existing.data() as Partial<TriviaPackScoreEntry> | undefined;
-    const duplicateEntry: TriviaPackScoreEntry = {
-      uid,
-      score:
-        typeof existingData?.score === "number"
-          ? existingData.score
-          : scoreEntry.score,
-      maxScore:
-        typeof existingData?.maxScore === "number"
-          ? existingData.maxScore
-          : scoreEntry.maxScore,
-      correct:
-        typeof existingData?.correct === "number"
-          ? existingData.correct
-          : scoreEntry.correct,
-      durationSeconds:
-        typeof existingData?.durationSeconds === "number"
-          ? existingData.durationSeconds
-          : scoreEntry.durationSeconds,
-      completedAt:
-        existingData?.completedAt instanceof admin.firestore.Timestamp
-          ? existingData.completedAt
-          : scoreEntry.completedAt,
-    };
+  const packScoreRef = db.doc(`triviaPacks/${triviaPackId}/scores/${uid}`);
+  const resolveEntryFromExisting = (
+    existingData: Partial<TriviaPackScoreEntry> | undefined
+  ): TriviaPackScoreEntry => ({
+    uid,
+    score:
+      typeof existingData?.score === "number"
+        ? existingData.score
+        : scoreEntry.score,
+    maxScore:
+      typeof existingData?.maxScore === "number"
+        ? existingData.maxScore
+        : scoreEntry.maxScore,
+    correct:
+      typeof existingData?.correct === "number"
+        ? existingData.correct
+        : scoreEntry.correct,
+    durationSeconds:
+      typeof existingData?.durationSeconds === "number"
+        ? existingData.durationSeconds
+        : scoreEntry.durationSeconds,
+    completedAt:
+      existingData?.completedAt instanceof admin.firestore.Timestamp
+        ? existingData.completedAt
+        : scoreEntry.completedAt,
+  });
 
-    const scoresSnap = await db
-      .collection(`triviaPacks/${triviaPackId}/scores`)
-      .orderBy("score", "desc")
-      .orderBy("completedAt", "asc")
-      .get();
-
-    const entries = scoresSnap.docs.map((doc) => {
-      const data = doc.data() as TriviaPackScoreEntry;
-      return {
-        uid: doc.id,
-        score: data.score,
-        maxScore: data.maxScore,
-        correct: data.correct,
-        durationSeconds: data.durationSeconds,
-        completedAt: data.completedAt,
-      };
-    });
-
-    const leaderboard = buildTriviaPackLeaderboard(entries, uid, 10);
-
-    return {
-      triviaPackId,
-      score: duplicateEntry.score,
-      maxScore: duplicateEntry.maxScore,
-      correct: duplicateEntry.correct,
-      total: duplicateEntry.maxScore,
-      leaderboard,
-      ok: true,
-      duplicate: true,
-    };
-  }
-
-  try {
-    await scoreRef.create({
-      ...scoreEntry,
-      gameId,
-      triviaPackId,
-    });
-  } catch (error) {
-    const code = (error as { code?: string | number }).code;
-    if (code === "already-exists" || code === 6) {
+  const transactionResult = await db.runTransaction(async (transaction) => {
+    const existing = await transaction.get(scoreRef);
+    if (existing.exists) {
+      const existingData = existing.data() as
+        | (Partial<TriviaPackScoreEntry> & { gameId?: string })
+        | undefined;
+      const existingGameId =
+        typeof existingData?.gameId === "string"
+          ? existingData.gameId
+          : undefined;
+      if (existingGameId && existingGameId !== gameId) {
+        throw new HttpsError(
+          "failed-precondition",
+          "Trivia pack already completed for a different game"
+        );
+      }
       logger.info("submitSoloScore duplicate score submission", {
         gameId,
         triviaPackId,
         scoreId,
         uid,
       });
-      const existingRetry = await scoreRef.get();
-      const retryData =
-        (existingRetry.data() as Partial<TriviaPackScoreEntry> | undefined) ??
-        undefined;
-      const duplicateEntry: TriviaPackScoreEntry = {
-        uid,
-        score:
-          typeof retryData?.score === "number"
-            ? retryData.score
-            : scoreEntry.score,
-        maxScore:
-          typeof retryData?.maxScore === "number"
-            ? retryData.maxScore
-            : scoreEntry.maxScore,
-        correct:
-          typeof retryData?.correct === "number"
-            ? retryData.correct
-            : scoreEntry.correct,
-        durationSeconds:
-          typeof retryData?.durationSeconds === "number"
-            ? retryData.durationSeconds
-            : scoreEntry.durationSeconds,
-        completedAt:
-          retryData?.completedAt instanceof admin.firestore.Timestamp
-            ? retryData.completedAt
-            : scoreEntry.completedAt,
-      };
-
-      const scoresSnap = await db
-        .collection(`triviaPacks/${triviaPackId}/scores`)
-        .orderBy("score", "desc")
-        .orderBy("completedAt", "asc")
-        .get();
-
-      const entries = scoresSnap.docs.map((doc) => {
-        const data = doc.data() as TriviaPackScoreEntry;
-        return {
-          uid: doc.id,
-          score: data.score,
-          maxScore: data.maxScore,
-          correct: data.correct,
-          durationSeconds: data.durationSeconds,
-          completedAt: data.completedAt,
-        };
-      });
-
-      const leaderboard = buildTriviaPackLeaderboard(entries, uid, 10);
-
       return {
-        triviaPackId,
-        score: duplicateEntry.score,
-        maxScore: duplicateEntry.maxScore,
-        correct: duplicateEntry.correct,
-        total: duplicateEntry.maxScore,
-        leaderboard,
-        ok: true,
         duplicate: true,
+        entry: resolveEntryFromExisting(existingData),
       };
     }
-    throw error;
-  }
 
-  await db
-    .doc(`triviaPacks/${triviaPackId}/scores/${uid}`)
-    .set(scoreEntry, { merge: true });
+    transaction.set(scoreRef, {
+      ...scoreEntry,
+      gameId,
+      triviaPackId,
+    });
+    transaction.set(
+      packScoreRef,
+      {
+        ...scoreEntry,
+        gameId,
+      },
+      { merge: true }
+    );
+    return { duplicate: false, entry: scoreEntry };
+  });
 
   const scoresSnap = await db
     .collection(`triviaPacks/${triviaPackId}/scores`)
@@ -1086,11 +1011,12 @@ export const submitSoloScore = onCall(async (request) => {
 
   return {
     triviaPackId,
-    score: scoreEntry.score,
-    maxScore: scoreEntry.maxScore,
-    correct: scoreEntry.correct,
-    total: scoreEntry.maxScore,
+    score: transactionResult.entry.score,
+    maxScore: transactionResult.entry.maxScore,
+    correct: transactionResult.entry.correct,
+    total: transactionResult.entry.maxScore,
     leaderboard,
+    ...(transactionResult.duplicate ? { ok: true, duplicate: true } : {}),
   };
 });
 
