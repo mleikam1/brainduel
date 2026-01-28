@@ -235,6 +235,15 @@ class QuizController extends StateNotifier<TriviaGameState> {
     );
   }
 
+  bool _shouldLogBackendFailure(GameFunctionsException error) {
+    // Avoid logging expected backend responses (failed-precondition for completed games or
+    // no-questions responses) to keep analytics focused on unexpected backend failures.
+    if (error.code == 'failed-precondition') return false;
+    if (_isAlreadyCompletedError(error)) return false;
+    if (_isNoQuestionsError(error)) return false;
+    return true;
+  }
+
   void _logGameFailed(String stage, {String? code}) {
     ref.read(analyticsServiceProvider).logEvent(
       'trivia_game_failed',
@@ -337,13 +346,11 @@ class QuizController extends StateNotifier<TriviaGameState> {
     final trimmedCategoryId = categoryId.trim();
     if (trimmedCategoryId.isEmpty) {
       state = _markGameStartFailure('Please choose a category to continue.');
-      _logGameFailed('start', code: 'missing-category');
       return;
     }
     final userId = ref.read(authUserIdProvider);
     if (userId == null || userId.isEmpty) {
       state = _markGameStartFailure('Please sign in to continue.');
-      _logGameFailed('start', code: 'unauthenticated');
       return;
     }
     final userReady = ref.read(userBootstrapReadyProvider);
@@ -351,7 +358,6 @@ class QuizController extends StateNotifier<TriviaGameState> {
       state = _markGameStartFailure(
         'Your account is still getting set up. Please try again shortly.',
       );
-      _logGameFailed('start', code: 'user-not-ready');
       return;
     }
     _isStarting = true;
@@ -361,7 +367,6 @@ class QuizController extends StateNotifier<TriviaGameState> {
       final categoryExists = categories.any((category) => category.id == trimmedCategoryId);
       if (!categoryExists) {
         state = _markGameStartFailure('That category is not available right now.');
-        _logGameFailed('start', code: 'category-unavailable');
         return;
       }
       final analytics = ref.read(analyticsServiceProvider);
@@ -376,7 +381,6 @@ class QuizController extends StateNotifier<TriviaGameState> {
           'QuizController startGame createGame error: code=${e.code} message=${e.message} details=${e.details}',
         );
         debugPrintStack(stackTrace: st);
-        _logGameFailed('start', code: e.code);
         if (_isNoQuestionsError(e)) {
           _logBackendStartEvent(
             event: 'backend_no_questions',
@@ -398,6 +402,9 @@ class QuizController extends StateNotifier<TriviaGameState> {
             message: _messageForGameError(e),
           );
           return;
+        }
+        if (_shouldLogBackendFailure(e)) {
+          _logGameFailed('start', code: e.code);
         }
         _logBackendStartEvent(
           event: 'backend_unrecoverable_error',
@@ -438,7 +445,6 @@ class QuizController extends StateNotifier<TriviaGameState> {
     } catch (e, st) {
       debugPrint('QuizController startGame error: $e');
       debugPrintStack(stackTrace: st);
-      _logGameFailed('start');
       state = _markGameStartFailure(_formatError(e));
     } finally {
       _isStarting = false;
@@ -449,7 +455,6 @@ class QuizController extends StateNotifier<TriviaGameState> {
     final userId = ref.read(authUserIdProvider);
     if (userId == null || userId.isEmpty) {
       state = _markGameStartFailure('Please sign in to continue.');
-      _logGameFailed('load', code: 'unauthenticated');
       return;
     }
     final userReady = ref.read(userBootstrapReadyProvider);
@@ -457,7 +462,6 @@ class QuizController extends StateNotifier<TriviaGameState> {
       state = _markGameStartFailure(
         'Your account is still getting set up. Please try again shortly.',
       );
-      _logGameFailed('load', code: 'user-not-ready');
       return;
     }
     state = state.copyWith(loading: true, error: null);
@@ -491,17 +495,18 @@ class QuizController extends StateNotifier<TriviaGameState> {
       debugPrint('QuizController loadGame error: $e');
       debugPrintStack(stackTrace: st);
       if (e is GameFunctionsException) {
-        _logGameFailed('load', code: e.code);
         if (_isAlreadyCompletedError(e)) {
           state = _markAlreadyCompleted(
             state.copyWith(loading: false),
             message: _messageForGameError(e),
           );
+        } else if (_shouldLogBackendFailure(e)) {
+          _logGameFailed('load', code: e.code);
+          state = _markGameStartFailure(_messageForGameError(e));
         } else {
           state = _markGameStartFailure(_messageForGameError(e));
         }
       } else {
-        _logGameFailed('load');
         state = _markGameStartFailure(_formatError(e));
       }
     }
@@ -511,13 +516,11 @@ class QuizController extends StateNotifier<TriviaGameState> {
     final trimmedQuizId = quizId.trim();
     if (trimmedQuizId.isEmpty) {
       state = state.copyWith(error: 'This shared quiz link is missing an ID.');
-      _logGameFailed('load_shared', code: 'missing-quiz-id');
       return;
     }
     final userId = ref.read(authUserIdProvider);
     if (userId == null || userId.isEmpty) {
       state = _markGameStartFailure('Please sign in to continue.');
-      _logGameFailed('load_shared', code: 'unauthenticated');
       return;
     }
     final userReady = ref.read(userBootstrapReadyProvider);
@@ -525,7 +528,6 @@ class QuizController extends StateNotifier<TriviaGameState> {
       state = _markGameStartFailure(
         'Your account is still getting set up. Please try again shortly.',
       );
-      _logGameFailed('load_shared', code: 'user-not-ready');
       return;
     }
     state = state.copyWith(loading: true, error: null);
@@ -560,17 +562,18 @@ class QuizController extends StateNotifier<TriviaGameState> {
       debugPrint('QuizController loadSharedQuiz error: $e');
       debugPrintStack(stackTrace: st);
       if (e is GameFunctionsException) {
-        _logGameFailed('load_shared', code: e.code);
         if (_isAlreadyCompletedError(e)) {
           state = _markAlreadyCompleted(
             state.copyWith(loading: false),
             message: _messageForGameError(e),
           );
+        } else if (_shouldLogBackendFailure(e)) {
+          _logGameFailed('load_shared', code: e.code);
+          state = _markGameStartFailure(_messageForGameError(e));
         } else {
           state = _markGameStartFailure(_messageForGameError(e));
         }
       } else {
-        _logGameFailed('load_shared');
         state = _markGameStartFailure(_formatError(e));
       }
     }
@@ -580,13 +583,11 @@ class QuizController extends StateNotifier<TriviaGameState> {
     final trimmedPackId = triviaPackId.trim();
     if (trimmedPackId.isEmpty) {
       state = state.copyWith(error: 'This shared pack link is missing an ID.');
-      _logGameFailed('load_pack', code: 'missing-pack-id');
       return;
     }
     final userId = ref.read(authUserIdProvider);
     if (userId == null || userId.isEmpty) {
       state = _markGameStartFailure('Please sign in to continue.');
-      _logGameFailed('load_pack', code: 'unauthenticated');
       return;
     }
     final userReady = ref.read(userBootstrapReadyProvider);
@@ -594,7 +595,6 @@ class QuizController extends StateNotifier<TriviaGameState> {
       state = _markGameStartFailure(
         'Your account is still getting set up. Please try again shortly.',
       );
-      _logGameFailed('load_pack', code: 'user-not-ready');
       return;
     }
     state = state.copyWith(loading: true, error: null);
@@ -629,17 +629,18 @@ class QuizController extends StateNotifier<TriviaGameState> {
       debugPrint('QuizController loadTriviaPack error: $e');
       debugPrintStack(stackTrace: st);
       if (e is GameFunctionsException) {
-        _logGameFailed('load_pack', code: e.code);
         if (_isAlreadyCompletedError(e)) {
           state = _markAlreadyCompleted(
             state.copyWith(loading: false),
             message: _messageForGameError(e),
           );
+        } else if (_shouldLogBackendFailure(e)) {
+          _logGameFailed('load_pack', code: e.code);
+          state = _markGameStartFailure(_messageForGameError(e));
         } else {
           state = _markGameStartFailure(_messageForGameError(e));
         }
       } else {
-        _logGameFailed('load_pack');
         state = _markGameStartFailure(_formatError(e));
       }
     }
@@ -830,7 +831,6 @@ class QuizController extends StateNotifier<TriviaGameState> {
       debugPrint('QuizController completeGame error: $e');
       debugPrintStack(stackTrace: st);
       if (e is GameFunctionsException) {
-        _logGameFailed('complete', code: e.code);
         if (e.code == 'failed-precondition') {
           state = _markAlreadyCompleted(
             state,
@@ -844,13 +844,15 @@ class QuizController extends StateNotifier<TriviaGameState> {
             message: _messageForGameError(e),
           );
         } else {
+          if (_shouldLogBackendFailure(e)) {
+            _logGameFailed('complete', code: e.code);
+          }
           state = state.copyWith(
             isSubmitting: false,
             error: _messageForGameError(e),
           );
         }
       } else {
-        _logGameFailed('complete');
         state = state.copyWith(isSubmitting: false, error: _formatError(e));
       }
       return null;
@@ -916,7 +918,6 @@ class QuizController extends StateNotifier<TriviaGameState> {
       debugPrint('QuizController completeTriviaPack error: $e');
       debugPrintStack(stackTrace: st);
       if (e is GameFunctionsException) {
-        _logGameFailed('complete_pack', code: e.code);
         if (e.code == 'failed-precondition') {
           state = _markAlreadyCompleted(
             state,
@@ -924,12 +925,14 @@ class QuizController extends StateNotifier<TriviaGameState> {
           );
           return null;
         }
+        if (_shouldLogBackendFailure(e)) {
+          _logGameFailed('complete_pack', code: e.code);
+        }
         state = state.copyWith(
           isSubmitting: false,
           error: _messageForGameError(e),
         );
       } else {
-        _logGameFailed('complete_pack');
         state = state.copyWith(isSubmitting: false, error: _formatError(e));
       }
       return null;
