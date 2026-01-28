@@ -102,11 +102,17 @@ class GameFunctionsService {
     List<GameAnswer> answers,
   ) async {
     try {
-      final callable = _functions.httpsCallable('completeGame');
-      final result = await callable.call({
+      final payload = {
         'gameId': gameId,
         'answers': answers.map((answer) => answer.toJson()).toList(),
-      });
+      };
+      _validatePayload(
+        'completeGame',
+        payload,
+        requiredFields: {'gameId', 'answers'},
+      );
+      final callable = _functions.httpsCallable('completeGame');
+      final result = await callable.call(payload);
       final data = _requireMap(result.data, 'completeGame');
       return (
         score: (data['score'] as num).toInt(),
@@ -128,22 +134,31 @@ class GameFunctionsService {
     SoloPackLeaderboard leaderboard,
   })> submitSoloScore({
     required String triviaPackId,
-    required int score,
+    required int? score,
     int? correct,
     int? total,
     int? durationSeconds,
     List<GameAnswer>? answers,
   }) async {
     try {
-      final callable = _functions.httpsCallable('submitSoloScore');
-      final result = await callable.call({
+      final safeScore = score ?? 0;
+      final safeCorrect = correct ?? 0;
+      final safeTotal = total ?? 0;
+      final safeDurationSeconds = durationSeconds ?? 0;
+      final metadata = {
+        'durationSeconds': safeDurationSeconds,
+        'correct': safeCorrect,
+        'total': safeTotal,
+      };
+      _validatePayload(
+        'submitSoloScore.metadata',
+        metadata,
+        requiredFields: {'durationSeconds', 'correct', 'total'},
+      );
+      final payload = {
         'triviaPackId': triviaPackId,
-        'score': score,
-        'metadata': {
-          if (durationSeconds != null) 'durationSeconds': durationSeconds,
-          if (correct != null) 'correct': correct,
-          if (total != null) 'total': total,
-        },
+        'score': safeScore,
+        'metadata': metadata,
         if (answers != null)
           'answers': answers
               .map((answer) => {
@@ -151,9 +166,17 @@ class GameFunctionsService {
                     'selectedIndex': answer.selectedIndex,
                   })
               .toList(),
-      });
+      };
+      _validatePayload(
+        'submitSoloScore',
+        payload,
+        requiredFields: {'triviaPackId', 'score', 'metadata'},
+      );
+      final callable = _functions.httpsCallable('submitSoloScore');
+      final result = await callable.call(payload);
       final data = _requireMap(result.data, 'submitSoloScore');
-      final leaderboardJson = _requireMap(data['leaderboard'], 'submitSoloScore.leaderboard');
+      final leaderboardJson =
+          _requireMap(data['leaderboard'], 'submitSoloScore.leaderboard');
       return (
         score: (data['score'] as num).toInt(),
         maxScore: (data['maxScore'] as num).toInt(),
@@ -178,6 +201,34 @@ class GameFunctionsService {
       'internal',
       'Unexpected $functionName response payload.',
     );
+  }
+
+  void _validatePayload(
+    String functionName,
+    Map<String, Object?> payload, {
+    required Set<String> requiredFields,
+  }) {
+    for (final field in requiredFields) {
+      if (!payload.containsKey(field)) {
+        throw GameFunctionsException(
+          'invalid-argument',
+          'Missing required field "$field" for $functionName.',
+        );
+      }
+      final value = payload[field];
+      if (value == null) {
+        throw GameFunctionsException(
+          'invalid-argument',
+          'Null value for required field "$field" in $functionName.',
+        );
+      }
+      if (value is String && value.trim().isEmpty) {
+        throw GameFunctionsException(
+          'invalid-argument',
+          'Empty value for required field "$field" in $functionName.',
+        );
+      }
+    }
   }
 
   void _logCallableError(String name, FirebaseFunctionsException error) {
