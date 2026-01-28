@@ -770,23 +770,33 @@ class QuizController extends StateNotifier<TriviaGameState> {
             session.gameId,
             answers,
           );
+      _completedGameIds.add(session.gameId);
       SoloPackLeaderboard? leaderboard;
       final triviaPackId = session.triviaPackId;
       if (triviaPackId != null && triviaPackId.isNotEmpty) {
         final durationSeconds = state.startedAt == null
             ? null
             : DateTime.now().difference(state.startedAt!).inSeconds;
-        final leaderboardResult =
-            await ref.read(gameFunctionsServiceProvider).submitSoloScore(
-                  triviaPackId: triviaPackId,
-                  score: result.score,
-                  correct: result.correct,
-                  total: result.total,
-                  durationSeconds: durationSeconds,
-                );
-        leaderboard = leaderboardResult.leaderboard;
+        try {
+          final leaderboardResult =
+              await ref.read(gameFunctionsServiceProvider).submitSoloScore(
+                    triviaPackId: triviaPackId,
+                    score: result.score,
+                    correct: result.correct,
+                    total: result.total,
+                    durationSeconds: durationSeconds,
+                  );
+          leaderboard = leaderboardResult.leaderboard;
+        } on GameFunctionsException catch (e, st) {
+          debugPrint(
+            'QuizController completeGame submitSoloScore error: code=${e.code} message=${e.message} details=${e.details}',
+          );
+          debugPrintStack(stackTrace: st);
+          if (e.code != 'failed-precondition') {
+            rethrow;
+          }
+        }
       }
-      _completedGameIds.add(session.gameId);
       state = state.copyWith(
         points: result.score,
         correctAnswers: result.correct ?? state.correctAnswers,
@@ -821,6 +831,13 @@ class QuizController extends StateNotifier<TriviaGameState> {
       debugPrintStack(stackTrace: st);
       if (e is GameFunctionsException) {
         _logGameFailed('complete', code: e.code);
+        if (e.code == 'failed-precondition') {
+          state = _markAlreadyCompleted(
+            state,
+            message: _messageForGameError(e),
+          );
+          return null;
+        }
         if (_isAlreadyCompletedError(e)) {
           state = _markAlreadyCompleted(
             state,
@@ -844,6 +861,10 @@ class QuizController extends StateNotifier<TriviaGameState> {
       completeTriviaPack() async {
     final session = state.session;
     if (session == null) return null;
+    if (_completedGameIds.contains(session.gameId)) {
+      state = _markAlreadyCompleted(state);
+      return null;
+    }
     final triviaPackId = session.triviaPackId;
     if (triviaPackId == null || triviaPackId.isEmpty) {
       state = state.copyWith(error: 'Unable to submit pack score.');
@@ -896,6 +917,13 @@ class QuizController extends StateNotifier<TriviaGameState> {
       debugPrintStack(stackTrace: st);
       if (e is GameFunctionsException) {
         _logGameFailed('complete_pack', code: e.code);
+        if (e.code == 'failed-precondition') {
+          state = _markAlreadyCompleted(
+            state,
+            message: _messageForGameError(e),
+          );
+          return null;
+        }
         state = state.copyWith(
           isSubmitting: false,
           error: _messageForGameError(e),
