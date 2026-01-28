@@ -832,9 +832,11 @@ class QuizController extends StateNotifier<TriviaGameState> {
       debugPrintStack(stackTrace: st);
       if (e is GameFunctionsException) {
         if (e.code == 'failed-precondition') {
-          state = _markAlreadyCompleted(
-            state,
-            message: _messageForGameError(e),
+          // Backend already finalized the game; treat as completed locally to stop retries,
+          // avoid analytics noise, and prevent score submissions for a finalized game.
+          state = state.copyWith(
+            status: QuizStatus.completed,
+            isSubmitting: false,
           );
           return null;
         }
