@@ -138,6 +138,7 @@ class QuizController extends StateNotifier<TriviaGameState> {
   final Ref ref;
   final Map<String, int> _selectedIndexByQuestionId = {};
   final Set<String> _completedGameIds = {};
+  final Set<String> _submittedSoloScoreGameIds = {};
   final Set<String> _loggedEventKeys = {};
   final QuizAnalyticsHelper _quizAnalytics;
   bool _isStarting = false;
@@ -218,6 +219,16 @@ class QuizController extends StateNotifier<TriviaGameState> {
       return true;
     }
     return message.contains('already completed') || details.contains('already completed');
+  }
+
+  bool _isDuplicateSoloScoreSubmission(GameFunctionsException error) {
+    final details = error.details;
+    if (details is Map) {
+      final value = details['duplicate'];
+      if (value is bool) return value;
+      if (value is String) return value.toLowerCase() == 'true';
+    }
+    return false;
   }
 
   TriviaGameState _markAlreadyCompleted(TriviaGameState current, {String? message}) {
@@ -810,23 +821,29 @@ class QuizController extends StateNotifier<TriviaGameState> {
         final durationSeconds = state.startedAt == null
             ? null
             : DateTime.now().difference(state.startedAt!).inSeconds;
-        try {
-          final leaderboardResult =
-              await ref.read(gameFunctionsServiceProvider).submitSoloScore(
-                    triviaPackId: triviaPackId,
-                    score: result.score,
-                    correct: result.correct,
-                    total: result.total,
-                    durationSeconds: durationSeconds,
-                  );
-          leaderboard = leaderboardResult.leaderboard;
-        } on GameFunctionsException catch (e, st) {
-          debugPrint(
-            'QuizController completeGame submitSoloScore error: code=${e.code} message=${e.message} details=${e.details}',
-          );
-          debugPrintStack(stackTrace: st);
-          if (e.code != 'failed-precondition') {
-            rethrow;
+        if (!_submittedSoloScoreGameIds.contains(session.gameId)) {
+          _submittedSoloScoreGameIds.add(session.gameId);
+          try {
+            final leaderboardResult =
+                await ref.read(gameFunctionsServiceProvider).submitSoloScore(
+                      triviaPackId: triviaPackId,
+                      score: result.score,
+                      correct: result.correct,
+                      total: result.total,
+                      durationSeconds: durationSeconds,
+                    );
+            leaderboard = leaderboardResult.leaderboard;
+          } on GameFunctionsException catch (e, st) {
+            debugPrint(
+              'QuizController completeGame submitSoloScore error: code=${e.code} message=${e.message} details=${e.details}',
+            );
+            debugPrintStack(stackTrace: st);
+            if (_isDuplicateSoloScoreSubmission(e)) {
+              // Treat backend duplicate responses as a success so we finalize locally.
+            }
+          } catch (e, st) {
+            debugPrint('QuizController completeGame submitSoloScore error: $e');
+            debugPrintStack(stackTrace: st);
           }
         }
       }
