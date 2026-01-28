@@ -44,9 +44,11 @@ class FriendsService {
     if (payloadRaw is! Map) {
       throw StateError('Invalid friend payload.');
     }
-    final payload = Map<String, dynamic>.from(payloadRaw);
+    final payload = Map<String, dynamic>.from(payloadRaw as Map);
     final friendRaw = payload['friend'];
-    final friendJson = friendRaw is Map ? Map<String, dynamic>.from(friendRaw) : const {};
+    final friendJson = friendRaw is Map
+        ? Map<String, dynamic>.from(friendRaw as Map)
+        : const <String, dynamic>{};
     return FriendProfile.fromJson(friendJson);
   }
 
@@ -65,7 +67,7 @@ class FriendsService {
     if (payloadRaw is! Map) {
       throw StateError('Invalid contacts payload.');
     }
-    final payload = Map<String, dynamic>.from(payloadRaw);
+    final payload = Map<String, dynamic>.from(payloadRaw as Map);
     final rawMatches = payload['matches'];
     List<Map<String, dynamic>> matches;
     if (rawMatches == null) {
@@ -76,7 +78,7 @@ class FriendsService {
           if (match is! Map) {
             throw StateError('Invalid friend match payload.');
           }
-          return Map<String, dynamic>.from(match);
+          return Map<String, dynamic>.from(match as Map);
         }),
       );
     } else {
