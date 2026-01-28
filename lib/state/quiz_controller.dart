@@ -833,10 +833,13 @@ class QuizController extends StateNotifier<TriviaGameState> {
       if (e is GameFunctionsException) {
         if (e.code == 'failed-precondition') {
           // Backend already finalized the game; treat as completed locally to stop retries,
-          // avoid analytics noise, and prevent score submissions for a finalized game.
+          // avoid analytics noise, and block any score submissions for a finalized game.
+          _completedGameIds.add(session.gameId);
           state = state.copyWith(
-            status: QuizStatus.completed,
             isSubmitting: false,
+            isLocked: true,
+            showAlreadyCompletedModal: true,
+            error: _messageForGameError(e),
           );
           return null;
         }
