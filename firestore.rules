@@ -15,6 +15,11 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == uid;
     }
 
+    // Allow Firebase Admin SDK / Cloud Functions service account access.
+    function isAdmin() {
+      return request.auth != null && request.auth.token.admin == true;
+    }
+
     /* =========================
        Trivia Question Bank
        ========================= */
@@ -56,12 +61,12 @@ service cloud.firestore {
     match /users/{uid} {
 
       // Users can read/write their own user doc
-      allow read, write: if isOwner(uid);
+      allow read, write: if isOwner(uid) || isAdmin();
 
       // Per-category quiz progress
-      match /categoryProgress/{docId} {
-        // Allow anonymous (Firebase Auth) users to read/write their own progress.
-        allow read, write: if isOwner(uid);
+      match /categoryProgress/{categoryId} {
+        // Allow authenticated users to read/write their own progress.
+        allow read, write: if isOwner(uid) || isAdmin();
       }
     }
 
