@@ -4,8 +4,10 @@ import 'package:go_router/go_router.dart';
 import '../app.dart';
 import '../models/challenge_result.dart';
 import '../models/leaderboard_entry.dart';
+import '../models/quiz_result.dart';
 import '../models/solo_pack_leaderboard.dart';
 import '../state/challenge_providers.dart';
+import '../state/quiz_controller.dart';
 import '../state/share_providers.dart';
 import '../theme/brain_duel_theme.dart';
 import '../widgets/app_scaffold.dart';
@@ -15,24 +17,78 @@ import '../widgets/bd_card.dart';
 import '../widgets/bd_stat_pill.dart';
 import '../widgets/score_summary.dart';
 
-class TriviaResultScreen extends ConsumerWidget {
+class TriviaResultScreen extends ConsumerStatefulWidget {
   const TriviaResultScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final args = (ModalRoute.of(context)?.settings.arguments as Map?)?.cast<String, dynamic>() ?? {};
-    final challengeResult = args['challengeResult'] as ChallengeResult?;
+  ConsumerState<TriviaResultScreen> createState() => _TriviaResultScreenState();
+}
+
+class _TriviaResultScreenState extends ConsumerState<TriviaResultScreen> {
+  Map<String, dynamic> _args = const {};
+  QuizResult? _quizResult;
+  ChallengeResult? _challengeResult;
+  bool _submissionAttempted = false;
+  bool _submissionFailed = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _args = (ModalRoute.of(context)?.settings.arguments as Map?)?.cast<String, dynamic>() ?? {};
+    _challengeResult = _args['challengeResult'] as ChallengeResult?;
+    _quizResult = _args['quizResult'] as QuizResult?;
+    if (_challengeResult == null) {
+      _submitResultIfNeeded();
+    }
+  }
+
+  void _submitResultIfNeeded() {
+    final quizResult = _quizResult;
+    if (_submissionAttempted || quizResult == null) return;
+    _submissionAttempted = true;
+    ref.read(quizControllerProvider.notifier).submitGameResult(quizResult).then((success) {
+      if (!mounted || success) return;
+      setState(() => _submissionFailed = true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('We could not submit your score. Your results are still saved locally.'),
+          action: SnackBarAction(
+            label: 'Retry',
+            onPressed: () {
+              if (!mounted) return;
+              setState(() {
+                _submissionAttempted = false;
+                _submissionFailed = false;
+              });
+              _submitResultIfNeeded();
+            },
+          ),
+        ),
+      );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final challengeResult = _challengeResult;
     if (challengeResult != null) {
       return ChallengeResultView(result: challengeResult);
     }
-    final categoryId = (args['categoryId'] as String?) ?? 'sports';
-    final correct = (args['correct'] as int?) ?? 0;
-    final total = (args['total'] as int?) ?? 0;
-    final points = (args['points'] as int?) ?? (correct * 100);
-    final startedAt = DateTime.tryParse(args['startedAt'] as String? ?? '');
+    final quizResult = _quizResult;
+    if (quizResult == null) {
+      return const BDAppScaffold(
+        title: 'Scoreboard',
+        child: Center(child: Text('Quiz results are unavailable.')),
+      );
+    }
+    final categoryId = (_args['categoryId'] as String?) ?? 'sports';
+    final correct = quizResult.correctCount;
+    final total = quizResult.totalQuestions;
+    final points = quizResult.score;
+    final startedAt = DateTime.tryParse(_args['startedAt'] as String? ?? '');
     final timeTaken = startedAt == null ? const Duration(seconds: 0) : DateTime.now().difference(startedAt);
-    final triviaPackId = args['triviaPackId'] as String?;
-    final leaderboardJson = args['leaderboard'] as Map?;
+    final triviaPackId = _args['triviaPackId'] as String?;
+    final leaderboardJson = _args['leaderboard'] as Map?;
     final leaderboard = leaderboardJson == null
         ? null
         : SoloPackLeaderboard.fromJson(Map<String, dynamic>.from(leaderboardJson));
@@ -93,6 +149,16 @@ class TriviaResultScreen extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     ScoreSummary(correct: correct, total: total, points: points, timeTaken: timeTaken),
+                    if (_submissionFailed) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        'Score submission failed. You can retry from the message above or continue playing.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context).colorScheme.error,
+                            ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
                     const SizedBox(height: 16),
                     Text('Top Rankings', style: Theme.of(context).textTheme.titleMedium),
                     const SizedBox(height: 12),
