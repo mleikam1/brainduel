@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/game_answer.dart';
 import '../models/game_session.dart';
-import '../models/solo_pack_leaderboard.dart';
 
 final gameFunctionsServiceProvider = Provider<GameFunctionsService>((ref) {
   return GameFunctionsService(FirebaseFunctions.instance);
@@ -126,13 +125,7 @@ class GameFunctionsService {
     }
   }
 
-  Future<({
-    int score,
-    int maxScore,
-    int? correct,
-    int? total,
-    SoloPackLeaderboard leaderboard,
-  })> submitSoloScore({
+  Future<bool> submitSoloScore({
     required String triviaPackId,
     required int? score,
     int? correct,
@@ -173,20 +166,14 @@ class GameFunctionsService {
         requiredFields: {'triviaPackId', 'score', 'metadata'},
       );
       final callable = _functions.httpsCallable('submitSoloScore');
-      final result = await callable.call(payload);
-      final data = _requireMap(result.data, 'submitSoloScore');
-      final leaderboardJson =
-          _requireMap(data['leaderboard'], 'submitSoloScore.leaderboard');
-      return (
-        score: (data['score'] as num).toInt(),
-        maxScore: (data['maxScore'] as num).toInt(),
-        correct: (data['correct'] as num?)?.toInt(),
-        total: (data['total'] as num?)?.toInt(),
-        leaderboard: SoloPackLeaderboard.fromJson(leaderboardJson),
-      );
+      await callable.call(payload);
+      return true;
     } on FirebaseFunctionsException catch (error) {
       _logCallableError('submitSoloScore', error);
-      throw GameFunctionsException.fromFirebase(error);
+      return false;
+    } catch (error) {
+      debugPrint('Callable submitSoloScore failed: $error');
+      return false;
     }
   }
 

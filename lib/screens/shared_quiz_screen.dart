@@ -116,8 +116,8 @@ class _SharedQuizScreenState extends ConsumerState<SharedQuizScreen>
       if (!mounted || result == null) return;
       final state = ref.read(quizControllerProvider);
       final session = state.session!;
-      final total = result.total ?? session.questionsSnapshot.length;
-      final correct = result.correct ?? state.correctAnswers;
+      final total = result.totalQuestions;
+      final correct = result.correctCount;
       final points = result.score;
 
       ref.read(userStatsProvider.notifier).recordGame(
@@ -130,11 +130,10 @@ class _SharedQuizScreenState extends ConsumerState<SharedQuizScreen>
         TriviaApp.namePostQuizAd,
         extra: {
           'categoryId': session.topicId,
-          'correct': correct,
-          'total': total,
-          'points': points,
+          'quizResult': result,
           'startedAt': state.startedAt?.toIso8601String(),
           'isPaidUser': ref.read(isPaidUserProvider),
+          'points': points,
         },
       );
     });

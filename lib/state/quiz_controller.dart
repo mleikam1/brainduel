@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/game_answer.dart';
 import '../models/game_session.dart';
+import '../models/quiz_result.dart';
 import '../models/solo_pack_leaderboard.dart';
 import '../services/analytics_service.dart';
 import '../services/game_functions_service.dart';
@@ -138,7 +139,7 @@ class QuizController extends StateNotifier<TriviaGameState> {
   final Ref ref;
   final Map<String, int> _selectedIndexByQuestionId = {};
   final Set<String> _completedGameIds = {};
-  final Set<String> _submittedSoloScoreGameIds = {};
+  final Set<String> _submittedGameResultIds = {};
   final Set<String> _loggedEventKeys = {};
   final QuizAnalyticsHelper _quizAnalytics;
   bool _isStarting = false;
@@ -219,16 +220,6 @@ class QuizController extends StateNotifier<TriviaGameState> {
       return true;
     }
     return message.contains('already completed') || details.contains('already completed');
-  }
-
-  bool _isDuplicateSoloScoreSubmission(GameFunctionsException error) {
-    final details = error.details;
-    if (details is Map) {
-      final value = details['duplicate'];
-      if (value is bool) return value;
-      if (value is String) return value.toLowerCase() == 'true';
-    }
-    return false;
   }
 
   TriviaGameState _markAlreadyCompleted(TriviaGameState current, {String? message}) {
@@ -764,100 +755,75 @@ class QuizController extends StateNotifier<TriviaGameState> {
     );
   }
 
-  Future<({int score, int maxScore, int? correct, int? total, SoloPackLeaderboard? leaderboard})?>
-      completeGame() async {
+  QuizResult _buildQuizResult(GameSession session) {
+    final answers = session.questionsSnapshot.map((question) {
+      final rawIndex = _selectedIndexByQuestionId[question.id] ?? 0;
+      final selectedIndex = rawIndex.clamp(0, question.choices.length - 1);
+      final correctIndex = question.correctIndex.clamp(0, question.choices.length - 1);
+      return QuizResultAnswer(
+        questionId: question.id,
+        selectedIndex: selectedIndex,
+        correctIndex: correctIndex,
+      );
+    }).toList();
+    final correctCount =
+        answers.where((answer) => answer.selectedIndex == answer.correctIndex).length;
+    final score = correctCount * 100;
+    return QuizResult(
+      totalQuestions: answers.length,
+      correctCount: correctCount,
+      score: score,
+      answers: answers,
+    );
+  }
+
+  List<GameAnswer> _buildGameAnswers(GameSession session, QuizResult result) {
+    final questionById = {
+      for (final question in session.questionsSnapshot) question.id: question,
+    };
+    return result.answers.map((answer) {
+      final question = questionById[answer.questionId];
+      if (question == null || question.choices.isEmpty) {
+        return GameAnswer(
+          questionId: answer.questionId,
+          choice: '',
+          selectedIndex: answer.selectedIndex,
+        );
+      }
+      final boundedIndex = answer.selectedIndex.clamp(0, question.choices.length - 1);
+      return GameAnswer(
+        questionId: answer.questionId,
+        choice: question.choices[boundedIndex],
+        selectedIndex: boundedIndex,
+      );
+    }).toList();
+  }
+
+  Future<QuizResult?> completeGame() async {
     final session = state.session;
     if (session == null) return null;
     if (_completedGameIds.contains(session.gameId)) {
       state = _markAlreadyCompleted(state);
       return null;
     }
-    if (state.hasSubmitted) {
-      state = state.copyWith(
-        error: state.error ?? 'Your quiz submission is already being processed.',
-      );
-      return null;
-    }
-    bool completionSucceeded = false;
     try {
       state = state.copyWith(
         isSubmitting: true,
         hasSubmitted: true,
         error: null,
       );
-      final answers = session.questionsSnapshot.map((question) {
-        final index = _selectedIndexByQuestionId[question.id] ?? 0;
-        final boundedIndex = index.clamp(0, question.choices.length - 1);
-        return GameAnswer(
-          questionId: question.id,
-          choice: question.choices[boundedIndex],
-          selectedIndex: boundedIndex,
-        );
-      }).toList();
-      late final ({int score, int maxScore, int? correct, int? total}) result;
-      try {
-        result = await ref.read(gameFunctionsServiceProvider).completeGame(
-              session.gameId,
-              answers,
-            );
-        completionSucceeded = true;
-      } on GameFunctionsException catch (e) {
-        if (e.code == 'failed-precondition') {
-          state = _markAlreadyCompleted(
-            state,
-            message: _messageForGameError(e),
-          );
-          return null;
-        }
-        rethrow;
-      }
-      if (!completionSucceeded) {
-        return null;
-      }
+      final result = _buildQuizResult(session);
       _completedGameIds.add(session.gameId);
-      SoloPackLeaderboard? leaderboard;
-      final triviaPackId = session.triviaPackId;
-      if (triviaPackId != null && triviaPackId.isNotEmpty) {
-        final durationSeconds = state.startedAt == null
-            ? null
-            : DateTime.now().difference(state.startedAt!).inSeconds;
-        if (!_submittedSoloScoreGameIds.contains(session.gameId)) {
-          _submittedSoloScoreGameIds.add(session.gameId);
-          try {
-            final leaderboardResult =
-                await ref.read(gameFunctionsServiceProvider).submitSoloScore(
-                      triviaPackId: triviaPackId,
-                      score: result.score,
-                      correct: result.correct,
-                      total: result.total,
-                      durationSeconds: durationSeconds,
-                    );
-            leaderboard = leaderboardResult.leaderboard;
-          } on GameFunctionsException catch (e, st) {
-            debugPrint(
-              'QuizController completeGame submitSoloScore error: code=${e.code} message=${e.message} details=${e.details}',
-            );
-            debugPrintStack(stackTrace: st);
-            if (_isDuplicateSoloScoreSubmission(e)) {
-              // Treat backend duplicate responses as a success so we finalize locally.
-            }
-          } catch (e, st) {
-            debugPrint('QuizController completeGame submitSoloScore error: $e');
-            debugPrintStack(stackTrace: st);
-          }
-        }
-      }
       state = state.copyWith(
         points: result.score,
-        correctAnswers: result.correct ?? state.correctAnswers,
+        correctAnswers: result.correctCount,
         isSubmitting: false,
         isLocked: true,
-        packLeaderboard: leaderboard,
       );
       _logQuizCompleted(
         session: session,
         score: result.score,
-        correctCount: result.correct ?? state.correctAnswers,
+        correctCount: result.correctCount,
         mode: _activeMode ?? 'solo',
       );
       ref.read(analyticsServiceProvider).logEvent(
@@ -865,17 +831,11 @@ class QuizController extends StateNotifier<TriviaGameState> {
         parameters: {
           'gameId': session.gameId,
           'score': result.score,
-          'maxScore': result.maxScore,
-          'total': result.total ?? session.questionsSnapshot.length,
+          'maxScore': result.totalQuestions * 100,
+          'total': result.totalQuestions,
         },
       );
-      return (
-        score: result.score,
-        maxScore: result.maxScore,
-        correct: result.correct,
-        total: result.total,
-        leaderboard: leaderboard,
-      );
+      return result;
     } catch (e, st) {
       debugPrint('QuizController completeGame error: $e');
       debugPrintStack(stackTrace: st);
@@ -913,8 +873,7 @@ class QuizController extends StateNotifier<TriviaGameState> {
     }
   }
 
-  Future<({int score, int maxScore, int? correct, int? total, SoloPackLeaderboard leaderboard})?>
-      completeTriviaPack() async {
+  Future<QuizResult?> completeTriviaPack() async {
     final session = state.session;
     if (session == null) return null;
     if (_completedGameIds.contains(session.gameId)) {
@@ -926,70 +885,46 @@ class QuizController extends StateNotifier<TriviaGameState> {
       state = state.copyWith(error: 'Unable to submit pack score.');
       return null;
     }
+    return completeGame();
+  }
+
+  Future<bool> submitGameResult(QuizResult result) async {
+    final session = state.session;
+    if (session == null) return false;
+    if (_submittedGameResultIds.contains(session.gameId)) return true;
+    final answers = _buildGameAnswers(session, result);
     try {
-      state = state.copyWith(isSubmitting: true, error: null);
-      final answers = session.questionsSnapshot.map((question) {
-        final index = _selectedIndexByQuestionId[question.id] ?? 0;
-        final boundedIndex = index.clamp(0, question.choices.length - 1);
-        return GameAnswer(
-          questionId: question.id,
-          choice: question.choices[boundedIndex],
-          selectedIndex: boundedIndex,
-        );
-      }).toList();
-      final durationSeconds = state.startedAt == null
-          ? null
-          : DateTime.now().difference(state.startedAt!).inSeconds;
-      final result = await ref.read(gameFunctionsServiceProvider).submitSoloScore(
-            triviaPackId: triviaPackId,
-            score: 0,
-            correct: state.correctAnswers,
-            total: session.questionsSnapshot.length,
-            durationSeconds: durationSeconds,
-            answers: answers,
-          );
-      state = state.copyWith(
-        points: result.score,
-        correctAnswers: result.correct ?? state.correctAnswers,
-        isSubmitting: false,
-        isLocked: true,
-        packLeaderboard: result.leaderboard,
-      );
-      _logQuizCompleted(
-        session: session,
-        score: result.score,
-        correctCount: result.correct ?? state.correctAnswers,
-        mode: _activeMode ?? 'pack',
-      );
-      return (
-        score: result.score,
-        maxScore: result.maxScore,
-        correct: result.correct,
-        total: result.total,
-        leaderboard: result.leaderboard,
-      );
-    } catch (e, st) {
-      debugPrint('QuizController completeTriviaPack error: $e');
-      debugPrintStack(stackTrace: st);
-      if (e is GameFunctionsException) {
-        if (e.code == 'failed-precondition') {
-          state = _markAlreadyCompleted(
-            state,
-            message: _messageForGameError(e),
-          );
-          return null;
+      try {
+        await ref.read(gameFunctionsServiceProvider).completeGame(session.gameId, answers);
+      } on GameFunctionsException catch (e) {
+        if (!_isAlreadyCompletedError(e)) {
+          rethrow;
         }
-        if (_shouldLogBackendFailure(e)) {
-          _logGameFailed('complete_pack', code: e.code);
-        }
-        state = state.copyWith(
-          isSubmitting: false,
-          error: _messageForGameError(e),
-        );
-      } else {
-        state = state.copyWith(isSubmitting: false, error: _formatError(e));
       }
-      return null;
+      final triviaPackId = session.triviaPackId;
+      if (triviaPackId != null && triviaPackId.isNotEmpty) {
+        final durationSeconds = state.startedAt == null
+            ? null
+            : DateTime.now().difference(state.startedAt!).inSeconds;
+        final submissionSucceeded =
+            await ref.read(gameFunctionsServiceProvider).submitSoloScore(
+                  triviaPackId: triviaPackId,
+                  score: result.score,
+                  correct: result.correctCount,
+                  total: result.totalQuestions,
+                  durationSeconds: durationSeconds,
+                  answers: answers,
+                );
+        if (!submissionSucceeded) {
+          return false;
+        }
+      }
+      _submittedGameResultIds.add(session.gameId);
+      return true;
+    } catch (e, st) {
+      debugPrint('QuizController submitGameResult error: $e');
+      debugPrintStack(stackTrace: st);
+      return false;
     }
   }
 
@@ -1001,6 +936,7 @@ class QuizController extends StateNotifier<TriviaGameState> {
   void reset() {
     _selectedIndexByQuestionId.clear();
     _loggedEventKeys.clear();
+    _submittedGameResultIds.clear();
     _activeMode = null;
     state = TriviaGameState.initial();
   }

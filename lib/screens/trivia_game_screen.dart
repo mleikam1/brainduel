@@ -143,8 +143,8 @@ class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> with Ticker
       if (!mounted || result == null) return;
       final state = ref.read(quizControllerProvider);
       final session = state.session!;
-      final total = result.total ?? session.questionsSnapshot.length;
-      final correct = result.correct ?? state.correctAnswers;
+      final total = result.totalQuestions;
+      final correct = result.correctCount;
       final points = result.score;
 
       ref.read(userStatsProvider.notifier).recordGame(
@@ -157,13 +157,11 @@ class _TriviaGameScreenState extends ConsumerState<TriviaGameScreen> with Ticker
         TriviaApp.namePostQuizAd,
         extra: {
           'categoryId': session.topicId,
-          'correct': correct,
-          'total': total,
-          'points': points,
+          'quizResult': result,
           'startedAt': state.startedAt?.toIso8601String(),
           'isPaidUser': ref.read(isPaidUserProvider),
           'triviaPackId': session.triviaPackId,
-          if (result.leaderboard != null) 'leaderboard': result.leaderboard!.toJson(),
+          'points': points,
         },
       );
     });
