@@ -325,6 +325,15 @@ class _ChallengeResultViewState extends ConsumerState<ChallengeResultView> with 
     super.dispose();
   }
 
+  void _resetQuizState() {
+    ref.read(quizControllerProvider.notifier).reset();
+  }
+
+  void _goHome() {
+    _resetQuizState();
+    context.goNamed(TriviaApp.nameHome);
+  }
+
   @override
   Widget build(BuildContext context) {
     final minutes = widget.result.completionTime.inMinutes;
@@ -333,127 +342,133 @@ class _ChallengeResultViewState extends ConsumerState<ChallengeResultView> with 
     final metadataAsync = ref.watch(challengeMetadataProvider(widget.result.challengeId));
     final rematchState = ref.watch(rematchProvider(widget.result.challengeId));
 
-    return BDAppScaffold(
-      title: 'Results',
-      child: Padding(
-        padding: const EdgeInsets.all(BrainDuelSpacing.sm),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            BDCard(
-              padding: const EdgeInsets.all(18),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Challenge Score', style: Theme.of(context).textTheme.titleMedium),
-                  const SizedBox(height: 12),
-                  AnimatedBuilder(
-                    animation: _pointsAnimation,
-                    builder: (context, _) => Text(
-                      '${_pointsAnimation.value} pts',
-                      style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w800),
+    return WillPopScope(
+      onWillPop: () async {
+        _goHome();
+        return false;
+      },
+      child: BDAppScaffold(
+        title: 'Results',
+        child: Padding(
+          padding: const EdgeInsets.all(BrainDuelSpacing.sm),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              BDCard(
+                padding: const EdgeInsets.all(18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Challenge Score', style: Theme.of(context).textTheme.titleMedium),
+                    const SizedBox(height: 12),
+                    AnimatedBuilder(
+                      animation: _pointsAnimation,
+                      builder: (context, _) => Text(
+                        '${_pointsAnimation.value} pts',
+                        style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w800),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text('Completed in ${minutes}m ${seconds}s'),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      BDStatPill(
-                        label: 'Rank',
-                        value: '#${widget.result.rank}',
-                        icon: Icons.emoji_events,
-                      ),
-                      BDStatPill(
-                        label: 'Delta',
-                        value: _deltaLabel(rankDelta),
-                        icon: _deltaIcon(rankDelta),
-                      ),
-                      AnimatedBuilder(
-                        animation: _percentileAnimation,
-                        builder: (context, _) => BDStatPill(
-                          label: 'Percentile',
-                          value: _hasPercentile && _percentileReady
-                              ? '${_percentileAnimation.value.toStringAsFixed(1)}%'
-                              : 'Forming...',
-                          icon: Icons.percent,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text('Friends Rank', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 12),
-            Expanded(
-              child: ListView.separated(
-                itemCount: widget.result.friends.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 10),
-                itemBuilder: (context, index) {
-                  final entry = widget.result.friends[index];
-                  return BDCard(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    child: Row(
+                    const SizedBox(height: 6),
+                    Text('Completed in ${minutes}m ${seconds}s'),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
                       children: [
-                        Text('#${entry.rank}', style: Theme.of(context).textTheme.titleSmall),
-                        const SizedBox(width: 12),
-                        BDAvatar(name: entry.name, radius: 18),
-                        const SizedBox(width: 12),
-                        Expanded(child: Text(entry.name, style: Theme.of(context).textTheme.bodyLarge)),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text('${entry.points} pts', style: Theme.of(context).textTheme.bodyLarge),
-                            Row(
-                              children: [
-                                Icon(_deltaIcon(entry.delta), size: 16),
-                                const SizedBox(width: 4),
-                                Text(_deltaLabel(entry.delta), style: Theme.of(context).textTheme.bodySmall),
-                              ],
-                            ),
-                          ],
+                        BDStatPill(
+                          label: 'Rank',
+                          value: '#${widget.result.rank}',
+                          icon: Icons.emoji_events,
+                        ),
+                        BDStatPill(
+                          label: 'Delta',
+                          value: _deltaLabel(rankDelta),
+                          icon: _deltaIcon(rankDelta),
+                        ),
+                        AnimatedBuilder(
+                          animation: _percentileAnimation,
+                          builder: (context, _) => BDStatPill(
+                            label: 'Percentile',
+                            value: _hasPercentile && _percentileReady
+                                ? '${_percentileAnimation.value.toStringAsFixed(1)}%'
+                                : 'Forming...',
+                            icon: Icons.percent,
+                          ),
                         ),
                       ],
                     ),
-                  );
-                },
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            BDPrimaryButton(
-              label: 'Share Results',
-              icon: Icons.share,
-              isExpanded: true,
-              onPressed: metadataAsync.when(
-                data: (metadata) => () => ref.read(shareServiceProvider).shareChallengeResult(
-                      context: context,
-                      result: widget.result,
-                      metadata: metadata,
-                    ),
-                loading: () => null,
-                error: (_, __) => () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Unable to load share details.')),
-                  );
-                },
+              const SizedBox(height: 16),
+              Text('Friends Rank', style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 12),
+              Expanded(
+                child: ListView.separated(
+                  itemCount: widget.result.friends.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  itemBuilder: (context, index) {
+                    final entry = widget.result.friends[index];
+                    return BDCard(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      child: Row(
+                        children: [
+                          Text('#${entry.rank}', style: Theme.of(context).textTheme.titleSmall),
+                          const SizedBox(width: 12),
+                          BDAvatar(name: entry.name, radius: 18),
+                          const SizedBox(width: 12),
+                          Expanded(child: Text(entry.name, style: Theme.of(context).textTheme.bodyLarge)),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text('${entry.points} pts', style: Theme.of(context).textTheme.bodyLarge),
+                              Row(
+                                children: [
+                                  Icon(_deltaIcon(entry.delta), size: 16),
+                                  const SizedBox(width: 4),
+                                  Text(_deltaLabel(entry.delta), style: Theme.of(context).textTheme.bodySmall),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
               ),
-            ),
-            const SizedBox(height: 10),
-            _RematchPanel(
-              state: rematchState,
-              challengeId: widget.result.challengeId,
-            ),
-            const SizedBox(height: 10),
-            BDSecondaryButton(
-              label: 'Back to Home',
-              isExpanded: true,
-              onPressed: () => context.goNamed(TriviaApp.nameHome),
-            ),
-          ],
+              const SizedBox(height: 12),
+              BDPrimaryButton(
+                label: 'Share Results',
+                icon: Icons.share,
+                isExpanded: true,
+                onPressed: metadataAsync.when(
+                  data: (metadata) => () => ref.read(shareServiceProvider).shareChallengeResult(
+                        context: context,
+                        result: widget.result,
+                        metadata: metadata,
+                      ),
+                  loading: () => null,
+                  error: (_, __) => () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Unable to load share details.')),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 10),
+              _RematchPanel(
+                state: rematchState,
+                challengeId: widget.result.challengeId,
+              ),
+              const SizedBox(height: 10),
+              BDSecondaryButton(
+                label: 'Back to Home',
+                isExpanded: true,
+                onPressed: _goHome,
+              ),
+            ],
+          ),
         ),
       ),
     );
