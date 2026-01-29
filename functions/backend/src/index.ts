@@ -385,17 +385,6 @@ export const createGame = onCall(async (request) => {
         requestedSize,
         appliedFilters,
       });
-      throw new HttpsError(
-        "failed-precondition",
-        `Not enough questions for topic ${questionResult.normalizedTopicId}. Found ${questionResult.eligibleQuestions}, need ${requestedSize}.`,
-        {
-          code: "INSUFFICIENT_QUESTIONS",
-          topicId: questionResult.normalizedTopicId,
-          inputTopicId: rawTopicId,
-          requestedSize,
-          poolSize: questionResult.eligibleQuestions,
-        }
-      );
     }
 
     const packResult = await createTriviaPackFromDocs(db, {

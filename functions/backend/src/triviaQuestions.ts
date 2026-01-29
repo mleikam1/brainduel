@@ -231,36 +231,106 @@ export async function getRandomQuestionsForTopic(
   const normalizedCategoryId = normalizeComparableId(categoryId);
   const topicCandidates = buildTopicQueryCandidates(trimmedTopicId);
   const limitedCandidates = topicCandidates.slice(0, 10);
+  const queryLimit = typeof limit === "number" ? limit : undefined;
+
+  logger.info("triviaQuestions topic normalization", {
+    topicId: normalizedTopicId,
+    inputTopicId: trimmedTopicId,
+    normalizedMatchesInput: trimmedTopicId === normalizedTopicId,
+  });
+
+  const filterEligibleDocs = (
+    docs: QueryDocumentSnapshot[],
+    categoryCandidate?: string
+  ) => {
+    const normalizedCategoryCandidate = normalizeComparableId(categoryCandidate);
+    return docs.filter((doc) => {
+      const data = doc.data() as { categoryId?: string; topicId?: string };
+      const docTopicId = normalizeComparableId(data.topicId);
+      if (docTopicId && docTopicId !== normalizedTopicId) {
+        return false;
+      }
+      if (!normalizedCategoryId && !normalizedCategoryCandidate) {
+        return true;
+      }
+      const docCategoryId = normalizeComparableId(data.categoryId);
+      if (!docCategoryId) {
+        return true;
+      }
+      return (
+        (!normalizedCategoryId || docCategoryId === normalizedCategoryId) &&
+        (!normalizedCategoryCandidate ||
+          docCategoryId === normalizedCategoryCandidate)
+      );
+    });
+  };
+
+  const logQueryResult = (collectionPath: string, docsReturned: number) => {
+    logger.info("triviaQuestions query", {
+      topicId: normalizedTopicId,
+      inputTopicId: trimmedTopicId,
+      collectionPath,
+      queryLimit,
+      docsReturned,
+    });
+  };
+
   const topicQuery =
     limitedCandidates.length > 1
       ? db.collection("questions").where("topicId", "in", limitedCandidates)
       : db.collection("questions").where("topicId", "==", limitedCandidates[0]);
   const querySnap = await topicQuery.get();
-  const allDocs = querySnap.docs;
-  const totalQuestions = allDocs.length;
-  const eligibleDocs = allDocs.filter((doc) => {
-    const data = doc.data() as { categoryId?: string; topicId?: string };
-    const docTopicId = normalizeComparableId(data.topicId);
-    if (docTopicId && docTopicId !== normalizedTopicId) {
-      return false;
+  logQueryResult("questions", querySnap.size);
+
+  let collectionPath = "questions";
+  let allDocs = querySnap.docs;
+  let totalQuestions = allDocs.length;
+  let eligibleDocs = filterEligibleDocs(allDocs);
+
+  if (eligibleDocs.length === 0) {
+    const categoryCandidates = collectCandidateValues([
+      categoryId,
+      trimmedTopicId,
+      normalizedTopicId,
+    ]);
+    for (const candidate of categoryCandidates) {
+      const candidatePath = `categories/${candidate}/questions`;
+      const candidateSnap = await db.collection(candidatePath).get();
+      logQueryResult(candidatePath, candidateSnap.size);
+      if (candidateSnap.empty) {
+        continue;
+      }
+      const candidateEligibleDocs = filterEligibleDocs(
+        candidateSnap.docs,
+        candidate
+      );
+      if (candidateEligibleDocs.length > 0) {
+        collectionPath = candidatePath;
+        allDocs = candidateSnap.docs;
+        totalQuestions = allDocs.length;
+        eligibleDocs = candidateEligibleDocs;
+        break;
+      }
     }
-    if (!normalizedCategoryId) {
-      return true;
-    }
-    const docCategoryId = normalizeComparableId(data.categoryId);
-    if (!docCategoryId) {
-      return true;
-    }
-    return docCategoryId === normalizedCategoryId;
-  });
+  }
+
   const eligibleQuestions = eligibleDocs.length;
+
+  const appliedCategoryId =
+    normalizedCategoryId ||
+    (collectionPath.startsWith("categories/")
+      ? normalizeComparableId(collectionPath.split("/")[1])
+      : undefined);
 
   logger.info("triviaQuestions pool summary", {
     topicId: normalizedTopicId,
     inputTopicId: trimmedTopicId,
+    collectionPath,
+    queryLimit,
+    docsReturned: totalQuestions,
     appliedFilters: {
       topicIdCandidates: limitedCandidates,
-      categoryId: normalizedCategoryId || undefined,
+      categoryId: appliedCategoryId || undefined,
     },
     poolSize: totalQuestions,
     eligibleSize: eligibleQuestions,
@@ -276,7 +346,7 @@ export async function getRandomQuestionsForTopic(
       normalizedTopicId,
       appliedFilters: {
         topicIdCandidates: limitedCandidates,
-        categoryId: normalizedCategoryId || undefined,
+        categoryId: appliedCategoryId || undefined,
       },
     };
   }
@@ -293,7 +363,7 @@ export async function getRandomQuestionsForTopic(
     normalizedTopicId,
     appliedFilters: {
       topicIdCandidates: limitedCandidates,
-      categoryId: normalizedCategoryId || undefined,
+      categoryId: appliedCategoryId || undefined,
     },
   };
 }
