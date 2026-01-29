@@ -15,7 +15,7 @@ class QuizResultAnswer {
 
 @immutable
 class QuizResult {
-  const QuizResult({
+  QuizResult({
     required this.totalQuestions,
     required this.correctCount,
     required this.score,
