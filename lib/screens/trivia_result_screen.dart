@@ -68,6 +68,20 @@ class _TriviaResultScreenState extends ConsumerState<TriviaResultScreen> {
     });
   }
 
+  void _resetQuizState() {
+    ref.read(quizControllerProvider.notifier).reset();
+  }
+
+  void _goHome() {
+    _resetQuizState();
+    context.goNamed(TriviaApp.nameHome);
+  }
+
+  void _goToCategories() {
+    _resetQuizState();
+    context.goNamed(TriviaApp.nameCategories);
+  }
+
   @override
   Widget build(BuildContext context) {
     final challengeResult = _challengeResult;
@@ -136,119 +150,123 @@ class _TriviaResultScreenState extends ConsumerState<TriviaResultScreen> {
     }
     participants.sort((a, b) => a.rank.compareTo(b.rank));
 
-    return BDAppScaffold(
-      title: 'Scoreboard',
-      child: Padding(
-        padding: const EdgeInsets.all(BrainDuelSpacing.sm),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            return SingleChildScrollView(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    ScoreSummary(correct: correct, total: total, points: points, timeTaken: timeTaken),
-                    if (_submissionFailed) ...[
+    return WillPopScope(
+      onWillPop: () async {
+        _goHome();
+        return false;
+      },
+      child: BDAppScaffold(
+        title: 'Scoreboard',
+        child: Padding(
+          padding: const EdgeInsets.all(BrainDuelSpacing.sm),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      ScoreSummary(correct: correct, total: total, points: points, timeTaken: timeTaken),
+                      if (_submissionFailed) ...[
+                        const SizedBox(height: 12),
+                        Text(
+                          'Score submission failed. You can retry from the message above or continue playing.',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: Theme.of(context).colorScheme.error,
+                              ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                      const SizedBox(height: 16),
+                      Text('Top Rankings', style: Theme.of(context).textTheme.titleMedium),
                       const SizedBox(height: 12),
-                      Text(
-                        'Score submission failed. You can retry from the message above or continue playing.',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Theme.of(context).colorScheme.error,
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: participants.take(3).map((entry) {
+                          final columns = constraints.maxWidth < 420 ? 2 : 3;
+                          final width = (constraints.maxWidth - (columns - 1) * 8) / columns;
+                          return SizedBox(
+                            width: width,
+                            child: BDCard(
+                              padding: const EdgeInsets.all(12),
+                              child: Column(
+                                children: [
+                                  BDAvatar(name: entry.name, radius: 18),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    '#${entry.rank}',
+                                    style: Theme.of(context).textTheme.titleMedium,
+                                  ),
+                                  Text(entry.name, style: Theme.of(context).textTheme.bodySmall),
+                                  const SizedBox(height: 4),
+                                  Text('${entry.points} pts', style: Theme.of(context).textTheme.labelLarge),
+                                ],
+                              ),
                             ),
-                        textAlign: TextAlign.center,
+                          );
+                        }).toList(),
                       ),
-                    ],
-                    const SizedBox(height: 16),
-                    Text('Top Rankings', style: Theme.of(context).textTheme.titleMedium),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: participants.take(3).map((entry) {
-                        final columns = constraints.maxWidth < 420 ? 2 : 3;
-                        final width = (constraints.maxWidth - (columns - 1) * 8) / columns;
-                        return SizedBox(
-                          width: width,
+                      const SizedBox(height: 16),
+                      ...participants.map((entry) {
+                        final minutes = entry.time.inMinutes;
+                        final seconds = entry.time.inSeconds.remainder(60);
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
                           child: BDCard(
-                            padding: const EdgeInsets.all(12),
-                            child: Column(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            child: Row(
                               children: [
+                                Text('#${entry.rank}', style: Theme.of(context).textTheme.titleSmall),
+                                const SizedBox(width: 12),
                                 BDAvatar(name: entry.name, radius: 18),
-                                const SizedBox(height: 8),
-                                Text(
-                                  '#${entry.rank}',
-                                  style: Theme.of(context).textTheme.titleMedium,
+                                const SizedBox(width: 12),
+                                Expanded(child: Text(entry.name, style: Theme.of(context).textTheme.bodyLarge)),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text('${entry.points} pts', style: Theme.of(context).textTheme.bodyLarge),
+                                    Text('${minutes}m ${seconds}s', style: Theme.of(context).textTheme.bodySmall),
+                                  ],
                                 ),
-                                Text(entry.name, style: Theme.of(context).textTheme.bodySmall),
-                                const SizedBox(height: 4),
-                                Text('${entry.points} pts', style: Theme.of(context).textTheme.labelLarge),
                               ],
                             ),
                           ),
                         );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: 16),
-                    ...participants.map((entry) {
-                      final minutes = entry.time.inMinutes;
-                      final seconds = entry.time.inSeconds.remainder(60);
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: BDCard(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                          child: Row(
-                            children: [
-                              Text('#${entry.rank}', style: Theme.of(context).textTheme.titleSmall),
-                              const SizedBox(width: 12),
-                              BDAvatar(name: entry.name, radius: 18),
-                              const SizedBox(width: 12),
-                              Expanded(child: Text(entry.name, style: Theme.of(context).textTheme.bodyLarge)),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text('${entry.points} pts', style: Theme.of(context).textTheme.bodyLarge),
-                                  Text('${minutes}m ${seconds}s', style: Theme.of(context).textTheme.bodySmall),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    }),
-                    const SizedBox(height: 12),
-                    BDPrimaryButton(
-                      label: 'Share Results',
-                      icon: Icons.share,
-                      isExpanded: true,
-                      onPressed: triviaPackId == null || triviaPackId.isEmpty
-                          ? null
-                          : () => ref.read(shareServiceProvider).shareTriviaPack(
-                                context: context,
-                                triviaPackId: triviaPackId,
-                                topicId: categoryId,
-                                score: points,
-                              ),
-                    ),
-                    const SizedBox(height: 10),
-                    BDSecondaryButton(
-                      label: 'Play Again',
-                      isExpanded: true,
-                      onPressed: () => context.goNamed(
-                        TriviaApp.nameGame,
-                        extra: categoryId,
+                      }),
+                      const SizedBox(height: 12),
+                      BDPrimaryButton(
+                        label: 'Share Results',
+                        icon: Icons.share,
+                        isExpanded: true,
+                        onPressed: triviaPackId == null || triviaPackId.isEmpty
+                            ? null
+                            : () => ref.read(shareServiceProvider).shareTriviaPack(
+                                  context: context,
+                                  triviaPackId: triviaPackId,
+                                  topicId: categoryId,
+                                  score: points,
+                                ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextButton(
-                      onPressed: () => context.goNamed(TriviaApp.nameCategories),
-                      child: const Text('Back to Categories'),
-                    ),
-                  ],
+                      const SizedBox(height: 10),
+                      BDPrimaryButton(
+                        label: 'More Quizzes',
+                        isExpanded: true,
+                        onPressed: _goHome,
+                      ),
+                      const SizedBox(height: 10),
+                      BDSecondaryButton(
+                        label: 'Categories',
+                        isExpanded: true,
+                        onPressed: _goToCategories,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         ),
       ),
     );
