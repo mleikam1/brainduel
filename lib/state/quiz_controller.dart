@@ -137,7 +137,8 @@ class QuizController extends StateNotifier<TriviaGameState> {
         super(TriviaGameState.initial());
 
   final Ref ref;
-  final Map<String, int> _selectedIndexByQuestionId = {};
+  // Store immutable answer snapshots per question index so answers don't get overwritten.
+  final Map<int, QuizResultAnswer> _answersByIndex = {};
   final Set<String> _completedGameIds = {};
   final Set<String> _submittedGameResultIds = {};
   final Set<String> _loggedEventKeys = {};
@@ -443,7 +444,7 @@ class QuizController extends StateNotifier<TriviaGameState> {
       _activeMode = 'solo';
       _logQuizStarted(session, mode: 'solo');
 
-      _selectedIndexByQuestionId.clear();
+      _answersByIndex.clear();
       state = TriviaGameState.initial().copyWith(
         session: session,
         loading: false,
@@ -492,7 +493,7 @@ class QuizController extends StateNotifier<TriviaGameState> {
       _activeMode = 'shared';
       _logQuizStarted(session, mode: 'shared');
 
-      _selectedIndexByQuestionId.clear();
+      _answersByIndex.clear();
       state = TriviaGameState.initial().copyWith(
         session: session,
         loading: false,
@@ -559,7 +560,7 @@ class QuizController extends StateNotifier<TriviaGameState> {
       _activeMode = 'shared';
       _logQuizStarted(session, mode: 'shared');
 
-      _selectedIndexByQuestionId.clear();
+      _answersByIndex.clear();
       state = TriviaGameState.initial().copyWith(
         session: session,
         loading: false,
@@ -626,7 +627,7 @@ class QuizController extends StateNotifier<TriviaGameState> {
       _activeMode = 'pack';
       _logQuizStarted(session, mode: 'pack');
 
-      _selectedIndexByQuestionId.clear();
+      _answersByIndex.clear();
       state = TriviaGameState.initial().copyWith(
         session: session,
         loading: false,
@@ -693,11 +694,17 @@ class QuizController extends StateNotifier<TriviaGameState> {
     if (state.isSubmitting) return;
 
     final q = session.questionsSnapshot[state.currentIndex];
-    if (_selectedIndexByQuestionId.containsKey(q.id)) return;
+    if (_answersByIndex.containsKey(state.currentIndex)) return;
     if (answerIndex < 0 || answerIndex >= q.choices.length) return;
-    _selectedIndexByQuestionId[q.id] = answerIndex;
+    final boundedAnswerIndex = answerIndex.clamp(0, q.choices.length - 1);
+    final correctIndex = q.correctIndex.clamp(0, q.choices.length - 1);
+    _answersByIndex[state.currentIndex] = QuizResultAnswer(
+      questionId: q.id,
+      selectedAnswerIndex: boundedAnswerIndex,
+      correctAnswerIndex: correctIndex,
+    );
     state = state.copyWith(
-      selectedIndex: answerIndex,
+      selectedIndex: boundedAnswerIndex,
       isAnswered: true,
       isTimedOut: false,
       hasAnsweredAny: true,
@@ -742,9 +749,14 @@ class QuizController extends StateNotifier<TriviaGameState> {
     if (state.isSubmitting) return;
 
     final q = state.session!.questionsSnapshot[state.currentIndex];
-    final fallbackIndex = _selectedIndexByQuestionId[q.id] ?? 0;
+    if (_answersByIndex.containsKey(state.currentIndex)) return;
+    final fallbackIndex = _answersByIndex[state.currentIndex]?.selectedAnswerIndex ?? 0;
     final boundedIndex = fallbackIndex.clamp(0, q.choices.length - 1);
-    _selectedIndexByQuestionId[q.id] = boundedIndex;
+    _answersByIndex[state.currentIndex] = QuizResultAnswer(
+      questionId: q.id,
+      selectedAnswerIndex: boundedIndex,
+      correctAnswerIndex: q.correctIndex.clamp(0, q.choices.length - 1),
+    );
 
     state = state.copyWith(
       selectedIndex: boundedIndex,
@@ -755,26 +767,20 @@ class QuizController extends StateNotifier<TriviaGameState> {
     );
   }
 
-  QuizResult _buildQuizResult(GameSession session) {
-    final answers = session.questionsSnapshot.map((question) {
-      final rawIndex = _selectedIndexByQuestionId[question.id] ?? 0;
-      final selectedIndex = rawIndex.clamp(0, question.choices.length - 1);
+  List<QuizResultAnswer> _buildQuizAnswers(GameSession session) {
+    return session.questionsSnapshot.asMap().entries.map((entry) {
+      final index = entry.key;
+      final question = entry.value;
+      final storedAnswer = _answersByIndex[index];
+      final selectedIndex =
+          (storedAnswer?.selectedAnswerIndex ?? 0).clamp(0, question.choices.length - 1);
       final correctIndex = question.correctIndex.clamp(0, question.choices.length - 1);
       return QuizResultAnswer(
         questionId: question.id,
-        selectedIndex: selectedIndex,
-        correctIndex: correctIndex,
+        selectedAnswerIndex: selectedIndex,
+        correctAnswerIndex: correctIndex,
       );
     }).toList();
-    final correctCount =
-        answers.where((answer) => answer.selectedIndex == answer.correctIndex).length;
-    final score = correctCount * 100;
-    return QuizResult(
-      totalQuestions: answers.length,
-      correctCount: correctCount,
-      score: score,
-      answers: answers,
-    );
   }
 
   List<GameAnswer> _buildGameAnswers(GameSession session, QuizResult result) {
@@ -787,10 +793,11 @@ class QuizController extends StateNotifier<TriviaGameState> {
         return GameAnswer(
           questionId: answer.questionId,
           choice: '',
-          selectedIndex: answer.selectedIndex,
+          selectedIndex: answer.selectedAnswerIndex,
         );
       }
-      final boundedIndex = answer.selectedIndex.clamp(0, question.choices.length - 1);
+      final boundedIndex =
+          answer.selectedAnswerIndex.clamp(0, question.choices.length - 1);
       return GameAnswer(
         questionId: answer.questionId,
         choice: question.choices[boundedIndex],
@@ -812,7 +819,23 @@ class QuizController extends StateNotifier<TriviaGameState> {
         hasSubmitted: true,
         error: null,
       );
-      final result = _buildQuizResult(session);
+      final answers = _buildQuizAnswers(session);
+      // Compute correctness once at completion using stored answer indices.
+      final correctCount = answers
+          .where((answer) => answer.selectedAnswerIndex == answer.correctAnswerIndex)
+          .length;
+      final score = correctCount * 100;
+      final result = QuizResult(
+        totalQuestions: answers.length,
+        correctCount: correctCount,
+        score: score,
+        answers: answers,
+      );
+      debugPrint(
+        'QuizController completeGame summary: total=${result.totalQuestions} '
+        'correct=${result.correctCount} '
+        'details=${result.answers.map((answer) => '${answer.questionId}:${answer.selectedAnswerIndex == answer.correctAnswerIndex}').join(', ')}',
+      );
       _completedGameIds.add(session.gameId);
       state = state.copyWith(
         points: result.score,
@@ -934,7 +957,7 @@ class QuizController extends StateNotifier<TriviaGameState> {
   }
 
   void reset() {
-    _selectedIndexByQuestionId.clear();
+    _answersByIndex.clear();
     _loggedEventKeys.clear();
     _submittedGameResultIds.clear();
     _activeMode = null;

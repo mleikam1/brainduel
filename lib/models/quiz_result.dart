@@ -4,13 +4,13 @@ import 'package:flutter/foundation.dart';
 class QuizResultAnswer {
   const QuizResultAnswer({
     required this.questionId,
-    required this.selectedIndex,
-    required this.correctIndex,
+    required this.selectedAnswerIndex,
+    required this.correctAnswerIndex,
   });
 
   final String questionId;
-  final int selectedIndex;
-  final int correctIndex;
+  final int selectedAnswerIndex;
+  final int correctAnswerIndex;
 }
 
 @immutable
