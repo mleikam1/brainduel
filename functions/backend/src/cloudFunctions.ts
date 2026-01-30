@@ -105,10 +105,19 @@ interface QuizChallengeRecord {
 }
 
 const SHARED_QUIZ_TTL_DAYS = 14;
-const sharedQuizCache = new Map<
-  string,
-  { expiresAtMs: number; payload: SharedQuizResponsePayload }
->();
+type SharedQuizCacheEntry = {
+  expiresAtMs: number;
+  payload: SharedQuizResponsePayload;
+};
+// Firebase CLI loads this module to discover triggers; module-scope work can
+// cause initialization timeouts during deploy, so keep caches lazy.
+let sharedQuizCache: Map<string, SharedQuizCacheEntry> | null = null;
+const getSharedQuizCache = (): Map<string, SharedQuizCacheEntry> => {
+  if (!sharedQuizCache) {
+    sharedQuizCache = new Map();
+  }
+  return sharedQuizCache;
+};
 
 /**
  * Utility: deterministic shuffle using seeded RNG
@@ -663,7 +672,7 @@ export const createSharedQuiz = onCall(async (request) => {
   };
 
   const payload = serializeSharedQuizResponse(response);
-  sharedQuizCache.set(quizId, {
+  getSharedQuizCache().set(quizId, {
     expiresAtMs: expiresAt.toMillis(),
     payload,
   });
@@ -682,7 +691,7 @@ export const getSharedQuiz = onCall(async (request) => {
     throw new HttpsError("invalid-argument", "quizId is required");
   }
 
-  const cached = sharedQuizCache.get(quizId);
+  const cached = getSharedQuizCache().get(quizId);
   if (cached && cached.expiresAtMs > Date.now()) {
     return cached.payload;
   }
@@ -731,7 +740,7 @@ export const getSharedQuiz = onCall(async (request) => {
   };
 
   const payload = serializeSharedQuizResponse(response);
-  sharedQuizCache.set(quizId, {
+  getSharedQuizCache().set(quizId, {
     expiresAtMs: expiresAt.toMillis(),
     payload,
   });
@@ -1183,6 +1192,3 @@ export const challenge = onRequest({ cors: true }, async (request, response) => 
     response.status(500).send("Internal server error");
   }
 });
-
-export * from "./quizSelection";
-export * from "./admin/diagnostics";
