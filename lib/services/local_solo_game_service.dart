@@ -81,14 +81,14 @@ class LocalSoloGameService {
     final questionsSnapshot = session.questions.map((question) {
       final displayAnswers = question.displayAnswers;
       final correct = displayAnswers.firstWhere((answer) => answer.correct);
-      final correctIndex = displayAnswers.indexOf(correct);
-      correctById[question.id] = correct.text;
+      correctById[question.id] = correct.id;
       return GameQuestion(
         id: question.id,
         prompt: question.question,
         choices: displayAnswers.map((answer) => answer.text).toList(),
+        choiceIds: displayAnswers.map((answer) => answer.id).toList(),
         difficulty: 'standard',
-        correctIndex: correctIndex < 0 ? 0 : correctIndex,
+        correctAnswerId: correct.id,
       );
     }).toList();
 

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/game_answer.dart';
+import '../models/game_question.dart';
 import '../models/game_session.dart';
 import '../models/quiz_result.dart';
 import '../models/solo_pack_leaderboard.dart';
@@ -697,11 +698,13 @@ class QuizController extends StateNotifier<TriviaGameState> {
     if (_answersByIndex.containsKey(state.currentIndex)) return;
     if (answerIndex < 0 || answerIndex >= q.choices.length) return;
     final boundedAnswerIndex = answerIndex.clamp(0, q.choices.length - 1);
-    final correctIndex = q.correctIndex.clamp(0, q.choices.length - 1);
+    final selectedAnswerId = q.choiceIds.isNotEmpty
+        ? q.choiceIds[boundedAnswerIndex]
+        : GameQuestion.buildChoiceId(q.id, q.choices[boundedAnswerIndex]);
     _answersByIndex[state.currentIndex] = QuizResultAnswer(
       questionId: q.id,
-      selectedAnswerIndex: boundedAnswerIndex,
-      correctAnswerIndex: correctIndex,
+      selectedAnswerId: selectedAnswerId,
+      correctAnswerId: q.correctAnswerId,
     );
     state = state.copyWith(
       selectedIndex: boundedAnswerIndex,
@@ -750,12 +753,17 @@ class QuizController extends StateNotifier<TriviaGameState> {
 
     final q = state.session!.questionsSnapshot[state.currentIndex];
     if (_answersByIndex.containsKey(state.currentIndex)) return;
-    final fallbackIndex = _answersByIndex[state.currentIndex]?.selectedAnswerIndex ?? 0;
-    final boundedIndex = fallbackIndex.clamp(0, q.choices.length - 1);
+    final fallbackAnswerId =
+        _answersByIndex[state.currentIndex]?.selectedAnswerId ??
+            (q.choiceIds.isNotEmpty ? q.choiceIds.first : '');
+    final boundedIndex = q.choiceIds.indexOf(fallbackAnswerId).clamp(
+          0,
+          q.choices.length - 1,
+        );
     _answersByIndex[state.currentIndex] = QuizResultAnswer(
       questionId: q.id,
-      selectedAnswerIndex: boundedIndex,
-      correctAnswerIndex: q.correctIndex.clamp(0, q.choices.length - 1),
+      selectedAnswerId: fallbackAnswerId,
+      correctAnswerId: q.correctAnswerId,
     );
 
     state = state.copyWith(
@@ -772,13 +780,12 @@ class QuizController extends StateNotifier<TriviaGameState> {
       final index = entry.key;
       final question = entry.value;
       final storedAnswer = _answersByIndex[index];
-      final selectedIndex =
-          (storedAnswer?.selectedAnswerIndex ?? 0).clamp(0, question.choices.length - 1);
-      final correctIndex = question.correctIndex.clamp(0, question.choices.length - 1);
+      final selectedAnswerId = storedAnswer?.selectedAnswerId ??
+          (question.choiceIds.isNotEmpty ? question.choiceIds.first : '');
       return QuizResultAnswer(
         questionId: question.id,
-        selectedAnswerIndex: selectedIndex,
-        correctAnswerIndex: correctIndex,
+        selectedAnswerId: selectedAnswerId,
+        correctAnswerId: question.correctAnswerId,
       );
     }).toList();
   }
@@ -793,11 +800,13 @@ class QuizController extends StateNotifier<TriviaGameState> {
         return GameAnswer(
           questionId: answer.questionId,
           choice: '',
-          selectedIndex: answer.selectedAnswerIndex,
+          selectedIndex: 0,
         );
       }
-      final boundedIndex =
-          answer.selectedAnswerIndex.clamp(0, question.choices.length - 1);
+      final selectedIndex = question.choiceIds.indexOf(answer.selectedAnswerId);
+      final boundedIndex = selectedIndex == -1
+          ? 0
+          : selectedIndex.clamp(0, question.choices.length - 1);
       return GameAnswer(
         questionId: answer.questionId,
         choice: question.choices[boundedIndex],
@@ -820,10 +829,21 @@ class QuizController extends StateNotifier<TriviaGameState> {
         error: null,
       );
       final answers = _buildQuizAnswers(session);
-      // Compute correctness once at completion using stored answer indices.
-      final correctCount = answers
-          .where((answer) => answer.selectedAnswerIndex == answer.correctAnswerIndex)
-          .length;
+      // Compute correctness once at completion using stable answer IDs.
+      var correctCount = 0;
+      for (final answer in answers) {
+        final isCorrect = answer.selectedAnswerId == answer.correctAnswerId;
+        if (isCorrect) {
+          correctCount += 1;
+        }
+        debugPrint(
+          'QuizController completeGame answer: '
+          'questionId=${answer.questionId} '
+          'selectedAnswerId=${answer.selectedAnswerId} '
+          'correctAnswerId=${answer.correctAnswerId} '
+          'isCorrect=$isCorrect',
+        );
+      }
       final score = correctCount * 100;
       final result = QuizResult(
         totalQuestions: answers.length,
@@ -834,7 +854,7 @@ class QuizController extends StateNotifier<TriviaGameState> {
       debugPrint(
         'QuizController completeGame summary: total=${result.totalQuestions} '
         'correct=${result.correctCount} '
-        'details=${result.answers.map((answer) => '${answer.questionId}:${answer.selectedAnswerIndex == answer.correctAnswerIndex}').join(', ')}',
+        'details=${result.answers.map((answer) => '${answer.questionId}:${answer.selectedAnswerId == answer.correctAnswerId}').join(', ')}',
       );
       _completedGameIds.add(session.gameId);
       state = state.copyWith(
