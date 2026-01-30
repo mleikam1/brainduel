@@ -1,12 +1,6 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
-import * as admin from "firebase-admin";
 import { resolveTopicId, generateTriviaPack } from "./triviaQuestions";
-
-if (!admin.apps.length) {
-  admin.initializeApp();
-}
-
-const db = admin.firestore();
+import { getDb } from "./firebase";
 
 interface QuizSelectionResponse {
   questionIds: string[];
@@ -37,6 +31,7 @@ function isoWeekKey(date: Date = new Date()): string {
 }
 
 export const selectQuizQuestions = onCall(async (request) => {
+  const db = getDb();
   const uid = request.auth?.uid;
   const categoryId = request.data?.categoryId as string | undefined;
   const topicId = request.data?.topicId as string | undefined;
