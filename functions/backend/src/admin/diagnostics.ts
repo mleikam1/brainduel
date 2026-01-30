@@ -5,12 +5,7 @@ import {
   buildTopicCandidates,
   resolveTopicId,
 } from "../triviaQuestions";
-
-if (!admin.apps.length) {
-  admin.initializeApp();
-}
-
-const db = admin.firestore();
+import { getDb } from "../firebase";
 
 function collectMissingFieldWarnings(
   docs: FirebaseFirestore.QueryDocumentSnapshot[]
@@ -52,6 +47,7 @@ async function runDiagnostics(request: {
     triviaPackId?: string;
   };
 }) {
+  const db = getDb();
   const uid = request.auth?.uid;
   const isAdmin = request.auth?.token?.admin === true;
   const topicId = request.data?.topicId as string | undefined;
