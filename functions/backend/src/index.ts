@@ -77,15 +77,6 @@ interface TriviaPackResponsePayload {
   questionsSnapshot: SharedQuizSnapshotQuestion[];
 }
 
-interface TriviaPackScoreEntry {
-  uid: string;
-  score: number;
-  maxScore: number;
-  correct?: number;
-  durationSeconds?: number;
-  completedAt: admin.firestore.Timestamp;
-}
-
 interface SharedQuizResponse {
   quizId: string;
   categoryId: string;
