@@ -836,6 +836,8 @@ export const submitSoloScore = onCall(async (request) => {
       const packSnap = await transaction.get(
         db.doc(`triviaPacks/${triviaPackId}`)
       );
+      const existing = await transaction.get(scoreRef);
+      const userSnap = await transaction.get(userRef);
       if (!packSnap.exists) {
         throw new HttpsError("not-found", "Trivia pack not found");
       }
@@ -851,7 +853,6 @@ export const submitSoloScore = onCall(async (request) => {
         );
       }
 
-      const existing = await transaction.get(scoreRef);
       const weekKey = isoWeekKey();
       const safeNumber = (value: unknown, fallback = 0): number => {
         if (typeof value !== "number") {
@@ -924,8 +925,6 @@ export const submitSoloScore = onCall(async (request) => {
         },
         { merge: true }
       );
-
-      const userSnap = await transaction.get(userRef);
       const userData = userSnap.data() as
         | { stats?: { bestStreak?: number } }
         | undefined;
