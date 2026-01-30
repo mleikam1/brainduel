@@ -875,6 +875,13 @@ export const submitSoloScore = onCall(async (request) => {
         return;
       }
 
+      const userData = userSnap.data() as
+        | { stats?: { bestStreak?: number } }
+        | undefined;
+      const existingBestStreak = Math.max(
+        0,
+        Math.floor(safeNumber(userData?.stats?.bestStreak, 0))
+      );
       const safeScore = Math.max(0, Math.floor(safeNumber(scoreInput, 0)));
       const safeTotal = Math.max(
         0,
@@ -889,6 +896,7 @@ export const submitSoloScore = onCall(async (request) => {
           ? Math.max(0, Math.floor(durationMsInput / 1000))
           : undefined;
       const xpEarned = Math.max(0, safeCorrect * 100);
+      const nextBestStreak = Math.max(existingBestStreak, safeCorrect);
 
       const completedAt = admin.firestore.FieldValue.serverTimestamp();
       const scoreEntry = cleanUndefined({
@@ -908,6 +916,12 @@ export const submitSoloScore = onCall(async (request) => {
         xpEarned,
       });
 
+      const cursorIncrement = Math.max(0, safeTotal);
+      const exhaustedIncrement = 0;
+      const categoryProgressRef = db.doc(
+        `users/${uid}/categoryProgress/${categoryId}`
+      );
+
       transaction.set(scoreRef, gamePayload, { merge: false });
       transaction.set(
         packScoreRef,
@@ -917,11 +931,8 @@ export const submitSoloScore = onCall(async (request) => {
         }),
         { merge: true }
       );
-
-      const cursorIncrement = Math.max(0, safeTotal);
-      const exhaustedIncrement = 0;
       transaction.set(
-        db.doc(`users/${uid}/categoryProgress/${categoryId}`),
+        categoryProgressRef,
         {
           weekKey,
           cursor: admin.firestore.FieldValue.increment(cursorIncrement),
@@ -929,14 +940,6 @@ export const submitSoloScore = onCall(async (request) => {
         },
         { merge: true }
       );
-      const userData = userSnap.data() as
-        | { stats?: { bestStreak?: number } }
-        | undefined;
-      const existingBestStreak = Math.max(
-        0,
-        Math.floor(safeNumber(userData?.stats?.bestStreak, 0))
-      );
-      const nextBestStreak = Math.max(existingBestStreak, safeCorrect);
       transaction.set(
         userRef,
         {
