@@ -1,3 +1,4 @@
+import * as functions from "firebase-functions";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions/logger";
 import * as admin from "firebase-admin";
@@ -85,16 +86,6 @@ interface TriviaPackScoreEntry {
   completedAt: admin.firestore.Timestamp;
 }
 
-interface TriviaPackLeaderboardEntryPayload {
-  uid: string;
-  score: number;
-  maxScore: number;
-  correct?: number;
-  durationSeconds?: number;
-  rank: number;
-  completedAt: SerializedTimestamp;
-}
-
 interface SharedQuizResponse {
   quizId: string;
   categoryId: string;
@@ -166,6 +157,12 @@ function nowTimestamp(): admin.firestore.Timestamp {
   return admin.firestore.Timestamp.fromDate(new Date());
 }
 
+function cleanUndefined<T extends Record<string, unknown>>(value: T): T {
+  return Object.fromEntries(
+    Object.entries(value).filter(([, entry]) => entry !== undefined)
+  ) as T;
+}
+
 function serializeTimestamp(
   timestamp: admin.firestore.Timestamp
 ): SerializedTimestamp {
@@ -222,39 +219,6 @@ async function resolveQuestionsSnapshot(
     }
     return normalizeQuestionSnapshot(doc);
   });
-}
-
-function buildTriviaPackLeaderboard(
-  entries: TriviaPackScoreEntry[],
-  currentUid: string,
-  limit = 10
-): { entries: TriviaPackLeaderboardEntryPayload[]; userRank: number } {
-  const sorted = [...entries].sort((a, b) => {
-    if (b.score !== a.score) return b.score - a.score;
-    return a.completedAt.toMillis() - b.completedAt.toMillis();
-  });
-  let userRank = -1;
-  const ranked: TriviaPackLeaderboardEntryPayload[] = sorted.map(
-    (entry, index) => {
-      const rank = index + 1;
-      if (entry.uid === currentUid) {
-        userRank = rank;
-      }
-      return {
-        uid: entry.uid,
-        score: entry.score,
-        maxScore: entry.maxScore,
-        correct: entry.correct,
-        durationSeconds: entry.durationSeconds,
-        rank,
-        completedAt: serializeTimestamp(entry.completedAt),
-      };
-    }
-  );
-  return {
-    entries: ranked.slice(0, limit),
-    userRank,
-  };
 }
 
 function serializeSharedQuizResponse(
@@ -823,32 +787,47 @@ export const getTriviaPack = onCall(async (request) => {
  */
 export const submitSoloScore = onCall(async (request) => {
   try {
+    logger.info("submitSoloScore request payload", {
+      data: request.data,
+    });
+
     const uid = request.auth?.uid;
-    const triviaPackId = request.data?.triviaPackId as string | undefined;
-    const gameId = (request.data?.gameId as string | undefined) ?? triviaPackId;
+    const gameId = request.data?.gameId as string | undefined;
+    const triviaPackId =
+      (request.data?.triviaPackId as string | undefined) ?? gameId;
+    const categoryId = request.data?.categoryId as string | undefined;
     const scoreInput = request.data?.score as number | undefined;
-    const metadata = request.data?.metadata as
-      | { durationSeconds?: number; correct?: number; total?: number }
-      | undefined;
-    const answers = request.data?.answers as
-      | { questionId: string; selectedIndex: number }[]
+    const correctCountInput = request.data?.correctCount as number | undefined;
+    const totalInput = request.data?.total as number | undefined;
+    const durationSecondsInput = request.data?.durationSeconds as
+      | number
       | undefined;
 
-    if (!uid) {
-      throw new HttpsError("unauthenticated", "User must be authenticated");
+    if (
+      !uid ||
+      !gameId ||
+      !categoryId ||
+      typeof scoreInput !== "number" ||
+      typeof correctCountInput !== "number" ||
+      typeof totalInput !== "number"
+    ) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "Missing required score fields"
+      );
     }
     if (!triviaPackId) {
-      throw new HttpsError("invalid-argument", "triviaPackId is required");
-    }
-    if (!gameId) {
-      throw new HttpsError("invalid-argument", "gameId is required");
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "Missing required score fields"
+      );
     }
 
     const scoreRef = db.collection("soloScores").doc(gameId);
     const packScoreRef = db.doc(`triviaPacks/${triviaPackId}/scores/${uid}`);
     const userRef = db.doc(`users/${uid}`);
 
-    const transactionResult = await db.runTransaction(async (transaction) => {
+    await db.runTransaction(async (transaction) => {
       const packSnap = await transaction.get(
         db.doc(`triviaPacks/${triviaPackId}`)
       );
@@ -857,10 +836,6 @@ export const submitSoloScore = onCall(async (request) => {
       }
 
       const packData = packSnap.data() as TriviaPackRecord;
-      const categoryId =
-        typeof packData.topicId === "string" && packData.topicId.length > 0
-          ? packData.topicId
-          : triviaPackId;
       const questionIds = Array.isArray(packData.questionIds)
         ? packData.questionIds
         : [];
@@ -882,156 +857,52 @@ export const submitSoloScore = onCall(async (request) => {
       const maxScore = Math.max(0, Math.floor(questionIds.length));
 
       if (existing.exists) {
-        const existingData = existing.data() as
-          | (Partial<TriviaPackScoreEntry> & {
-              gameId?: string;
-              triviaPackId?: string;
-              total?: number;
-              xpEarned?: number;
-            })
-          | undefined;
         logger.info("submitSoloScore duplicate score submission", {
           gameId,
           triviaPackId,
           uid,
         });
-        const duplicateEntry: TriviaPackScoreEntry = {
-          uid,
-          score: Math.max(
-            0,
-            Math.floor(safeNumber(existingData?.score, 0))
-          ),
-          maxScore: Math.max(
-            0,
-            Math.floor(safeNumber(existingData?.maxScore, maxScore))
-          ),
-          correct: Math.max(
-            0,
-            Math.floor(safeNumber(existingData?.correct, 0))
-          ),
-          durationSeconds: Math.max(
-            0,
-            Math.floor(safeNumber(existingData?.durationSeconds, 0))
-          ),
-          completedAt:
-            existingData?.completedAt instanceof admin.firestore.Timestamp
-              ? existingData.completedAt
-              : nowTimestamp(),
-        };
-        const duplicateTotal = Math.max(
-          0,
-          Math.floor(safeNumber(existingData?.total, duplicateEntry.maxScore))
-        );
-        const scoresSnap = await transaction.get(
-          db
-            .collection(`triviaPacks/${triviaPackId}/scores`)
-            .orderBy("score", "desc")
-            .orderBy("completedAt", "asc")
-        );
-        const entries = scoresSnap.docs.map((doc) => {
-          const data = doc.data() as TriviaPackScoreEntry;
-          return {
-            uid: doc.id,
-            score: Math.max(0, Math.floor(safeNumber(data.score, 0))),
-            maxScore: Math.max(0, Math.floor(safeNumber(data.maxScore, 0))),
-            correct: Math.max(0, Math.floor(safeNumber(data.correct, 0))),
-            durationSeconds: Math.max(
-              0,
-              Math.floor(safeNumber(data.durationSeconds, 0))
-            ),
-            completedAt:
-              data.completedAt instanceof admin.firestore.Timestamp
-                ? data.completedAt
-                : nowTimestamp(),
-          };
-        });
-        return {
-          duplicate: true,
-          entry: duplicateEntry,
-          leaderboardEntries: entries,
-          total: duplicateTotal,
-          weekKey,
-          maxScore,
-        };
+        return;
       }
 
-      let computedScore = typeof scoreInput === "number" ? scoreInput : null;
-      let correctCount =
-        typeof metadata?.correct === "number" ? metadata.correct : null;
-      const totalCount =
-        typeof metadata?.total === "number" ? metadata.total : maxScore;
-
-      if (Array.isArray(answers) && answers.length > 0) {
-        const answerMap = new Map(
-          answers.map((answer) => [answer.questionId, answer.selectedIndex])
-        );
-        const questionRefs = questionIds.map((id) =>
-          db.doc(`questions/${id}`)
-        );
-        const questionDocs = await Promise.all(
-          questionRefs.map((ref) => transaction.get(ref))
-        );
-        let score = 0;
-        let correct = 0;
-        questionDocs.forEach((doc) => {
-          if (!doc.exists) {
-            return;
-          }
-          const data = doc.data() as QuestionDoc;
-          const selectedIndex = answerMap.get(doc.id);
-          if (selectedIndex === data.correctIndex) {
-            score += 1;
-            correct += 1;
-          }
-        });
-        computedScore = score;
-        correctCount = correct;
-      }
-
-      if (computedScore == null || Number.isNaN(computedScore)) {
-        throw new HttpsError("invalid-argument", "score or answers are required");
-      }
-
-      const completedAt = nowTimestamp();
-      const durationSeconds = Math.max(
-        0,
-        Math.floor(safeNumber(metadata?.durationSeconds, 0))
-      );
-      const safeScore = Math.max(0, Math.floor(safeNumber(computedScore, 0)));
-      const safeTotal = Math.max(
-        0,
-        Math.floor(safeNumber(totalCount, maxScore))
-      );
+      const safeScore = Math.max(0, Math.floor(safeNumber(scoreInput, 0)));
+      const safeTotal = Math.max(0, Math.floor(safeNumber(totalInput, maxScore)));
       const safeCorrect = Math.min(
         safeTotal,
-        Math.max(0, Math.floor(safeNumber(correctCount, safeScore)))
+        Math.max(0, Math.floor(safeNumber(correctCountInput, safeScore)))
       );
+      const durationSeconds =
+        typeof durationSecondsInput === "number" &&
+        Number.isFinite(durationSecondsInput)
+          ? Math.max(0, Math.floor(durationSecondsInput))
+          : undefined;
       const xpEarned = Math.max(0, safeCorrect * 100);
 
-      const scoreEntry: TriviaPackScoreEntry = {
+      const completedAt = admin.firestore.FieldValue.serverTimestamp();
+      const scoreEntry = cleanUndefined({
         uid,
         score: safeScore,
         maxScore,
         correct: safeCorrect,
         durationSeconds,
         completedAt,
-      };
+      });
 
-      const gamePayload = {
+      const gamePayload = cleanUndefined({
         ...scoreEntry,
         gameId,
         triviaPackId,
         total: safeTotal,
         xpEarned,
-      };
+      });
 
       transaction.set(scoreRef, gamePayload, { merge: false });
       transaction.set(
         packScoreRef,
-        {
+        cleanUndefined({
           ...scoreEntry,
           gameId,
-        },
+        }),
         { merge: true }
       );
 
@@ -1072,56 +943,10 @@ export const submitSoloScore = onCall(async (request) => {
         { merge: true }
       );
 
-      const scoresSnap = await transaction.get(
-        db
-          .collection(`triviaPacks/${triviaPackId}/scores`)
-          .orderBy("score", "desc")
-          .orderBy("completedAt", "asc")
-      );
-      const entries = scoresSnap.docs.map((doc) => {
-        const data = doc.data() as TriviaPackScoreEntry;
-        return {
-          uid: doc.id,
-          score: Math.max(0, Math.floor(safeNumber(data.score, 0))),
-          maxScore: Math.max(0, Math.floor(safeNumber(data.maxScore, 0))),
-          correct: Math.max(0, Math.floor(safeNumber(data.correct, 0))),
-          durationSeconds: Math.max(
-            0,
-            Math.floor(safeNumber(data.durationSeconds, 0))
-          ),
-          completedAt:
-            data.completedAt instanceof admin.firestore.Timestamp
-              ? data.completedAt
-              : nowTimestamp(),
-        };
-      });
-
-      return {
-        duplicate: false,
-        entry: scoreEntry,
-        leaderboardEntries: entries,
-        total: safeTotal,
-        weekKey,
-        maxScore,
-      };
+      return;
     });
 
-    const leaderboard = buildTriviaPackLeaderboard(
-      transactionResult.leaderboardEntries,
-      uid,
-      10
-    );
-
-    return {
-      status: "ok",
-      triviaPackId,
-      score: transactionResult.entry.score,
-      maxScore: transactionResult.entry.maxScore,
-      correct: transactionResult.entry.correct,
-      total: transactionResult.total,
-      leaderboard,
-      duplicate: transactionResult.duplicate === true,
-    };
+    return { success: true };
   } catch (error) {
     logger.error("submitSoloScore failed", {
       error,
@@ -1129,13 +954,14 @@ export const submitSoloScore = onCall(async (request) => {
       gameId: request.data?.gameId,
       uid: request.auth?.uid,
     });
-    if (error instanceof HttpsError) {
+    if (
+      error instanceof functions.https.HttpsError &&
+      error.code === "invalid-argument"
+    ) {
       throw error;
     }
-    throw new HttpsError(
-      "internal",
-      "submitSoloScore failed to submit score"
-    );
+    const message = error instanceof Error ? error.message : "Unknown error";
+    throw new functions.https.HttpsError("internal", message);
   }
 });
 
