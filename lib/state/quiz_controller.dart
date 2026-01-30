@@ -946,19 +946,23 @@ class QuizController extends StateNotifier<TriviaGameState> {
       }
       final triviaPackId = session.triviaPackId;
       if (triviaPackId != null && triviaPackId.isNotEmpty) {
-        final durationSeconds = state.startedAt == null
+        final durationMs = state.startedAt == null
             ? null
-            : DateTime.now().difference(state.startedAt!).inSeconds;
-        final submissionSucceeded =
-            await ref.read(gameFunctionsServiceProvider).submitSoloScore(
-                  triviaPackId: triviaPackId,
-                  score: result.score,
-                  correct: result.correctCount,
-                  total: result.totalQuestions,
-                  durationSeconds: durationSeconds,
-                  answers: answers,
-                );
-        if (!submissionSucceeded) {
+            : DateTime.now().difference(state.startedAt!).inMilliseconds;
+        try {
+          await ref.read(gameFunctionsServiceProvider).submitSoloScore(
+                gameId: session.gameId,
+                categoryId: session.topicId,
+                triviaPackId: triviaPackId,
+                score: result.score,
+                correctCount: result.correctCount,
+                totalQuestions: result.totalQuestions,
+                durationMs: durationMs,
+                mode: 'solo',
+              );
+        } on GameFunctionsException catch (e, st) {
+          debugPrint('QuizController submitSoloScore error: $e');
+          debugPrintStack(stackTrace: st);
           return false;
         }
       }

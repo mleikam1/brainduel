@@ -125,55 +125,52 @@ class GameFunctionsService {
     }
   }
 
-  Future<bool> submitSoloScore({
-    required String triviaPackId,
-    required int? score,
-    int? correct,
-    int? total,
-    int? durationSeconds,
-    List<GameAnswer>? answers,
+  Future<void> submitSoloScore({
+    required String gameId,
+    required String categoryId,
+    required int score,
+    required int correctCount,
+    required int totalQuestions,
+    required String mode,
+    String? triviaPackId,
+    int? durationMs,
   }) async {
     try {
-      final safeScore = score ?? 0;
-      final safeCorrect = correct ?? 0;
-      final safeTotal = total ?? 0;
-      final safeDurationSeconds = durationSeconds ?? 0;
-      final metadata = {
-        'durationSeconds': safeDurationSeconds,
-        'correct': safeCorrect,
-        'total': safeTotal,
-      };
-      _validatePayload(
-        'submitSoloScore.metadata',
-        metadata,
-        requiredFields: {'durationSeconds', 'correct', 'total'},
-      );
+      final safeScore = score;
+      final safeCorrect = correctCount;
+      final safeTotal = totalQuestions;
+      final safeDurationMs = durationMs;
       final payload = {
-        'triviaPackId': triviaPackId,
+        'gameId': gameId,
+        'categoryId': categoryId,
         'score': safeScore,
-        'metadata': metadata,
-        if (answers != null)
-          'answers': answers
-              .map((answer) => {
-                    'questionId': answer.questionId,
-                    'selectedIndex': answer.selectedIndex,
-                  })
-              .toList(),
+        'correctCount': safeCorrect,
+        'totalQuestions': safeTotal,
+        'mode': mode,
+        if (triviaPackId != null && triviaPackId.trim().isNotEmpty)
+          'triviaPackId': triviaPackId.trim(),
+        if (safeDurationMs != null) 'durationMs': safeDurationMs,
       };
       _validatePayload(
         'submitSoloScore',
         payload,
-        requiredFields: {'triviaPackId', 'score', 'metadata'},
+        requiredFields: {
+          'gameId',
+          'categoryId',
+          'score',
+          'correctCount',
+          'totalQuestions',
+          'mode',
+        },
       );
       final callable = _functions.httpsCallable('submitSoloScore');
       await callable.call(payload);
-      return true;
     } on FirebaseFunctionsException catch (error) {
       _logCallableError('submitSoloScore', error);
-      return false;
+      throw GameFunctionsException.fromFirebase(error);
     } catch (error) {
       debugPrint('Callable submitSoloScore failed: $error');
-      return false;
+      throw GameFunctionsException('internal', error.toString());
     }
   }
 
