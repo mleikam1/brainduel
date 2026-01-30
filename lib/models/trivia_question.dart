@@ -18,6 +18,7 @@ class TriviaQuestion {
   });
 
   List<TriviaAnswer> get displayAnswers => sessionAnswers ?? answers;
+  String get correctAnswerId => answers.firstWhere((answer) => answer.correct).id;
 
   factory TriviaQuestion.fromJson(Map<String, dynamic> json) {
     final rawAnswers = json['answers'];
