@@ -1,5 +1,5 @@
 import * as functions from "firebase-functions";
-import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { onCall, onRequest, HttpsError } from "firebase-functions/v2/https";
 import { logger } from "firebase-functions/logger";
 import * as admin from "firebase-admin";
 import type {
@@ -94,6 +94,14 @@ interface SharedQuizResponsePayload {
   createdAt: SerializedTimestamp;
   expiresAt: SerializedTimestamp;
   questionsSnapshot: SharedQuizSnapshotQuestion[];
+}
+
+interface QuizChallengeRecord {
+  categoryId: string;
+  score: number;
+  createdByUid: string;
+  createdAt: admin.firestore.Timestamp;
+  expiresAt?: admin.firestore.Timestamp | null;
 }
 
 const SHARED_QUIZ_TTL_DAYS = 14;
@@ -1088,6 +1096,92 @@ export const completeGame = onCall(async (request) => {
   })();
 
   return { score, maxScore: questionIds.length };
+});
+
+export const challenge = onRequest({ cors: true }, async (request, response) => {
+  if (request.method !== "GET") {
+    response.set("Allow", "GET").status(405).send("Method Not Allowed");
+    return;
+  }
+
+  const pathSegments = request.path.split("/").filter(Boolean);
+  if (pathSegments.length !== 1) {
+    response.status(404).send("Not found");
+    return;
+  }
+
+  const challengeId = pathSegments[0];
+  if (!challengeId) {
+    response.status(404).send("Not found");
+    return;
+  }
+
+  const db = getDb();
+
+  try {
+    const challengeSnap = await db
+      .doc(`quiz_challenges/${challengeId}`)
+      .get();
+
+    if (!challengeSnap.exists) {
+      response.status(404).send("Not found");
+      return;
+    }
+
+    const data = challengeSnap.data() as QuizChallengeRecord;
+    if (
+      typeof data?.categoryId !== "string" ||
+      data.categoryId.trim().length === 0 ||
+      typeof data?.score !== "number" ||
+      Number.isNaN(data.score)
+    ) {
+      response.status(404).send("Not found");
+      return;
+    }
+
+    if (data.expiresAt instanceof admin.firestore.Timestamp) {
+      const expiresAtMs = data.expiresAt.toMillis();
+      if (expiresAtMs <= Date.now()) {
+        response.status(404).send("Not found");
+        return;
+      }
+    }
+
+    const categorySnap = await db
+      .doc(`categories/${data.categoryId}`)
+      .get();
+    if (!categorySnap.exists) {
+      response.status(404).send("Not found");
+      return;
+    }
+
+    const categoryData = categorySnap.data() as {
+      title?: string;
+      name?: string;
+    };
+    const categoryName =
+      (typeof categoryData?.title === "string" &&
+      categoryData.title.trim().length > 0
+        ? categoryData.title
+        : undefined) ??
+      (typeof categoryData?.name === "string" &&
+      categoryData.name.trim().length > 0
+        ? categoryData.name
+        : undefined) ??
+      data.categoryId;
+
+    response.status(200).json({
+      challengeId,
+      categoryName,
+      score: data.score,
+    });
+  } catch (error) {
+    logger.error("challenge lookup failed", {
+      error,
+      challengeId,
+    });
+    response.status(500).send("Internal server error");
+  }
 });
 
 export * from "./quizSelection";
