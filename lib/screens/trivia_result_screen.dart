@@ -47,9 +47,11 @@ class _TriviaResultScreenState extends ConsumerState<TriviaResultScreen> {
     if (_submissionAttempted || quizResult == null) return;
     _submissionAttempted = true;
     ref.read(quizControllerProvider.notifier).submitGameResult(quizResult).then((success) {
-      if (!mounted || success) return;
+      if (!mounted || success || _submissionFailed) return;
       setState(() => _submissionFailed = true);
-      ScaffoldMessenger.of(context).showSnackBar(
+      final messenger = ScaffoldMessenger.of(context);
+      messenger.clearSnackBars();
+      messenger.showSnackBar(
         SnackBar(
           content: const Text('We could not submit your score. Your results are still saved locally.'),
           action: SnackBarAction(

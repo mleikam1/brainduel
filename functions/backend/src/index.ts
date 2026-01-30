@@ -778,29 +778,43 @@ export const getTriviaPack = onCall(async (request) => {
  */
 export const submitSoloScore = onCall(async (request) => {
   try {
+    const data = (request.data ?? {}) as {
+      gameId?: string;
+      categoryId?: string;
+      score?: number;
+      correctCount?: number;
+      totalQuestions?: number;
+      mode?: "solo";
+      durationMs?: number;
+      triviaPackId?: string;
+    };
+    console.log("submitSoloScore payload", data);
     logger.info("submitSoloScore request payload", {
-      data: request.data,
+      data,
     });
 
     const uid = request.auth?.uid;
-    const gameId = request.data?.gameId as string | undefined;
-    const triviaPackId =
-      (request.data?.triviaPackId as string | undefined) ?? gameId;
-    const categoryId = request.data?.categoryId as string | undefined;
-    const scoreInput = request.data?.score as number | undefined;
-    const correctCountInput = request.data?.correctCount as number | undefined;
-    const totalInput = request.data?.total as number | undefined;
-    const durationSecondsInput = request.data?.durationSeconds as
-      | number
-      | undefined;
+    const gameId = data.gameId;
+    const triviaPackId = data.triviaPackId ?? gameId;
+    const categoryId = data.categoryId;
+    const scoreInput = data.score;
+    const correctCountInput = data.correctCount;
+    const totalQuestionsInput = data.totalQuestions;
+    const mode = data.mode;
+    const durationMsInput = data.durationMs;
+    const isValidNumber = (value: unknown): value is number =>
+      typeof value === "number" && Number.isFinite(value);
 
     if (
       !uid ||
-      !gameId ||
-      !categoryId ||
-      typeof scoreInput !== "number" ||
-      typeof correctCountInput !== "number" ||
-      typeof totalInput !== "number"
+      typeof gameId !== "string" ||
+      gameId.trim().length === 0 ||
+      typeof categoryId !== "string" ||
+      categoryId.trim().length === 0 ||
+      mode !== "solo" ||
+      !isValidNumber(scoreInput) ||
+      !isValidNumber(correctCountInput) ||
+      !isValidNumber(totalQuestionsInput)
     ) {
       throw new functions.https.HttpsError(
         "invalid-argument",
@@ -857,15 +871,17 @@ export const submitSoloScore = onCall(async (request) => {
       }
 
       const safeScore = Math.max(0, Math.floor(safeNumber(scoreInput, 0)));
-      const safeTotal = Math.max(0, Math.floor(safeNumber(totalInput, maxScore)));
+      const safeTotal = Math.max(
+        0,
+        Math.floor(safeNumber(totalQuestionsInput, maxScore))
+      );
       const safeCorrect = Math.min(
         safeTotal,
         Math.max(0, Math.floor(safeNumber(correctCountInput, safeScore)))
       );
       const durationSeconds =
-        typeof durationSecondsInput === "number" &&
-        Number.isFinite(durationSecondsInput)
-          ? Math.max(0, Math.floor(durationSecondsInput))
+        typeof durationMsInput === "number" && Number.isFinite(durationMsInput)
+          ? Math.max(0, Math.floor(durationMsInput / 1000))
           : undefined;
       const xpEarned = Math.max(0, safeCorrect * 100);
 
@@ -937,7 +953,7 @@ export const submitSoloScore = onCall(async (request) => {
       return;
     });
 
-    return { success: true };
+    return { ok: true };
   } catch (error) {
     logger.error("submitSoloScore failed", {
       error,
