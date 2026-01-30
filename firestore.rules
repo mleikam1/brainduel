@@ -99,6 +99,16 @@ service cloud.firestore {
     }
 
     /* =========================
+       Quiz Challenges
+       ========================= */
+
+    match /quiz_challenges/{challengeId} {
+      // Public read for shared challenges
+      allow read: if true;
+      allow write: if false;
+    }
+
+    /* =========================
        Trivia Packs
        ========================= */
 
