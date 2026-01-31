@@ -1,5 +1,6 @@
 import * as admin from "firebase-admin";
 
+// Keep module initialization side-effect free for Firebase deploys.
 admin.initializeApp();
 
 export {
