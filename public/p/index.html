@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Brain Duel Challenge</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background: #f6f7fb;
+        color: #1b1d26;
+      }
+
+      body {
+        margin: 0;
+        padding: 0;
+      }
+
+      .page {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 32px 20px 48px;
+      }
+
+      .card {
+        width: 100%;
+        max-width: 420px;
+        background: #ffffff;
+        border-radius: 20px;
+        box-shadow: 0 18px 45px rgba(17, 24, 39, 0.12);
+        padding: 28px 24px 32px;
+        text-align: center;
+      }
+
+      h1 {
+        font-size: 1.6rem;
+        margin: 0 0 12px;
+      }
+
+      .subtitle {
+        font-size: 1rem;
+        margin: 0 0 20px;
+        color: #5b6177;
+      }
+
+      .score-block {
+        background: #f1f4ff;
+        border-radius: 16px;
+        padding: 18px 16px;
+        margin-bottom: 20px;
+      }
+
+      .label {
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #5b6177;
+        margin-bottom: 8px;
+      }
+
+      .value {
+        font-size: 1.4rem;
+        font-weight: 600;
+      }
+
+      .buttons {
+        display: grid;
+        gap: 12px;
+        margin-top: 16px;
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        padding: 12px 16px;
+        border-radius: 12px;
+        border: none;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 1rem;
+        cursor: pointer;
+      }
+
+      .btn-primary {
+        background: #3b5bff;
+        color: #ffffff;
+      }
+
+      .btn-secondary {
+        background: #eef1ff;
+        color: #2a3aa9;
+      }
+
+      .status {
+        font-size: 1rem;
+        color: #5b6177;
+        margin: 12px 0 0;
+      }
+
+      .error {
+        color: #b42318;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="card" aria-live="polite">
+        <h1>Can you beat my score?</h1>
+        <p class="subtitle" id="subtitle">Loading challenge…</p>
+
+        <div class="score-block" id="score-block" hidden>
+          <div class="label">Topic</div>
+          <div class="value" id="topic">—</div>
+        </div>
+
+        <div class="score-block" id="score-block-score" hidden>
+          <div class="label">Score</div>
+          <div class="value" id="score">—</div>
+        </div>
+
+        <p class="status" id="status" hidden></p>
+
+        <div class="buttons" id="buttons" hidden>
+          <a class="btn btn-primary" id="open-app" href="#">Open in App</a>
+          <a
+            class="btn btn-secondary"
+            href="https://example.com"
+            target="_blank"
+            rel="noopener"
+          >
+            Get the App
+          </a>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const subtitle = document.getElementById("subtitle");
+      const topic = document.getElementById("topic");
+      const score = document.getElementById("score");
+      const status = document.getElementById("status");
+      const buttons = document.getElementById("buttons");
+      const scoreBlock = document.getElementById("score-block");
+      const scoreBlockScore = document.getElementById("score-block-score");
+      const openApp = document.getElementById("open-app");
+
+      const pathParts = window.location.pathname.split("/").filter(Boolean);
+      const shareIndex = pathParts.indexOf("p");
+      const shareId = shareIndex >= 0 ? pathParts[shareIndex + 1] : null;
+
+      function setError(message) {
+        subtitle.textContent = "We couldn't load this challenge.";
+        status.textContent = message;
+        status.classList.add("error");
+        status.hidden = false;
+        buttons.hidden = true;
+        scoreBlock.hidden = true;
+        scoreBlockScore.hidden = true;
+      }
+
+      if (!shareId) {
+        setError("Missing share link. Please check the URL and try again.");
+      } else {
+        openApp.href = window.location.href;
+        fetch(`/getShareChallenge?shareId=${encodeURIComponent(shareId)}`)
+          .then((response) => {
+            if (!response.ok) {
+              throw new Error("Unable to load challenge.");
+            }
+            return response.json();
+          })
+          .then((data) => {
+            const topicName = data.topicName || data.topic || "Unknown topic";
+            const scoreValue = data.score ?? data.bestScore ?? "—";
+
+            subtitle.textContent = "Think you can top this?";
+            topic.textContent = topicName;
+            score.textContent = scoreValue;
+            scoreBlock.hidden = false;
+            scoreBlockScore.hidden = false;
+            buttons.hidden = false;
+            status.hidden = true;
+          })
+          .catch((error) => {
+            console.error(error);
+            setError("This share link may be invalid or expired.");
+          });
+      }
+    </script>
+  </body>
+</html>
