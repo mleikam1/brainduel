@@ -123,7 +123,7 @@ type SharedQuizCacheEntry = {
 
  return globalScope.__sharedQuizCache__;
 
-};
+
 
 /**
  * Utility: deterministic shuffle using seeded RNG
