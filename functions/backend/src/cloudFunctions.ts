@@ -111,13 +111,18 @@ type SharedQuizCacheEntry = {
 };
 // Firebase CLI loads this module to discover triggers; avoid allocating caches
 // at import time. Lazily create the cache the first time a function runs.
-const getSharedQuizCache = (): Map<string, SharedQuizCacheEntry> => {
-  const cacheKey = "__sharedQuizCache__";
-  const globalScope = globalThis as { [key: string]: Map<string, SharedQuizCacheEntry> | undefined };
-  if (!globalScope[cacheKey]) {
-    globalScope[cacheKey] = new Map();
-  }
-  return globalScope[cacheKey] as Map<string, SharedQuizCacheEntry>;
+ const cacheKey = "__sharedQuizCache__";
+
+ const globalScope = globalThis as unknown as {
+   __sharedQuizCache__?: Map<string, SharedQuizCacheEntry>;
+ };
+
+ if (!globalScope.__sharedQuizCache__) {
+   globalScope.__sharedQuizCache__ = new Map();
+ }
+
+ return globalScope.__sharedQuizCache__;
+
 };
 
 /**
