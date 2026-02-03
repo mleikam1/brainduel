@@ -23,7 +23,7 @@ android {
 
     defaultConfig {
         // Firebase: Application ID must match the registered package name.
-        applicationId = "com.wingman.bbbd"
+        applicationId = "com.triviatussle.app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
