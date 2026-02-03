@@ -1,33 +1,33 @@
 {
   "project_info": {
-    "project_number": "599739618634",
-    "project_id": "wingman-interactive-live",
-    "storage_bucket": "wingman-interactive-live.firebasestorage.app"
+    "project_number": "942282552151",
+    "project_id": "trivia-tue",
+    "storage_bucket": "trivia-tue.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:599739618634:android:e6d8a359cfff59f5139db3",
+        "mobilesdk_app_id": "1:942282552151:android:e597a503f3f98e5d260412",
         "android_client_info": {
-          "package_name": "com.wingman.bbbd"
+          "package_name": "com.triviatussle.app"
         }
       },
       "oauth_client": [
         {
-          "client_id": "599739618634-bo9chd5mg9j0aucm6hn5rql4877kma1u.apps.googleusercontent.com",
+          "client_id": "942282552151-qebvu0tomlvt73f91sh2jkckscmfjuvb.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyAY_HNLYFfci4eazE48LuQyaeXvw54NYcs"
+          "current_key": "AIzaSyBv-_AlopeQzsaW9b56jJGkiLFOeiM7Qi0"
         }
       ],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "599739618634-bo9chd5mg9j0aucm6hn5rql4877kma1u.apps.googleusercontent.com",
+              "client_id": "942282552151-qebvu0tomlvt73f91sh2jkckscmfjuvb.apps.googleusercontent.com",
               "client_type": 3
             }
           ]
