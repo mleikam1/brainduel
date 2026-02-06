@@ -1,5 +1,6 @@
 {
   "projects": {
-    "trivia": "trivia-tue"
+    "trivia": "trivia-tue",
+    "default": "trivia-tue"
   }
 }
